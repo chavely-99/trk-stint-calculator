@@ -1248,6 +1248,11 @@ with tab2:
                                     st.markdown("**Slopes (s/lap)**")
                                     new_slopes = []
                                     slope_rows = st.columns(2)
+
+                                    # Initialize session state for slope adjustments
+                                    if f"slope_adjust_{name}" not in st.session_state:
+                                        st.session_state[f"slope_adjust_{name}"] = {}
+
                                     for i, s in enumerate(slopes):
                                         with slope_rows[i % 2]:
                                             # Dynamically determine bounds based on the fitted slope
@@ -1273,16 +1278,38 @@ with tab2:
 
                                             # Ensure step size is appropriate for the range
                                             step_size = (max_val - min_val) / 1000
+                                            fine_step = step_size * 0.1  # Finer step for +/- buttons
 
-                                            new_s = st.slider(
-                                                f"Segment {i+1}",
-                                                min_value=float(min_val),
-                                                max_value=float(max_val),
-                                                value=float(s),
-                                                step=float(step_size),
-                                                format="%.4f",
-                                                key=f"slope_{name}_{i}"
-                                            )
+                                            # Get current value (from session state if adjusted, otherwise from slopes)
+                                            current_val = st.session_state[f"slope_adjust_{name}"].get(i, s)
+
+                                            # Create columns: [-] [slider] [+]
+                                            col_minus, col_slider, col_plus = st.columns([0.5, 8, 0.5])
+
+                                            with col_minus:
+                                                if st.button("−", key=f"slope_minus_{name}_{i}"):
+                                                    new_val = max(min_val, current_val - fine_step)
+                                                    st.session_state[f"slope_adjust_{name}"][i] = new_val
+                                                    st.rerun()
+
+                                            with col_slider:
+                                                new_s = st.slider(
+                                                    f"Segment {i+1}",
+                                                    min_value=float(min_val),
+                                                    max_value=float(max_val),
+                                                    value=float(current_val),
+                                                    step=float(step_size),
+                                                    format="%.4f",
+                                                    key=f"slope_{name}_{i}"
+                                                )
+                                                st.session_state[f"slope_adjust_{name}"][i] = new_s
+
+                                            with col_plus:
+                                                if st.button("+", key=f"slope_plus_{name}_{i}"):
+                                                    new_val = min(max_val, current_val + fine_step)
+                                                    st.session_state[f"slope_adjust_{name}"][i] = new_val
+                                                    st.rerun()
+
                                             new_slopes.append(new_s)
 
                                     # Check if changed
