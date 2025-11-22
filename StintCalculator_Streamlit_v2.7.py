@@ -1219,6 +1219,7 @@ with tab2:
                                     y_data = series_data.values.astype(float)
                                     transitions, slopes, intercepts = detect_transition_points(x_data, y_data)
                                     st.session_state.model_linear_params[name] = {
+                                        "t0": 1.0,  # Default starting lap
                                         "transitions": transitions,
                                         "slopes": slopes,
                                         "intercepts": intercepts
@@ -1231,9 +1232,14 @@ with tab2:
                                 if not linear_params:
                                     st.warning("No linear parameters detected yet.")
                                 else:
+                                    t0 = linear_params.get("t0", 1.0)
                                     transitions = linear_params.get("transitions", [])
                                     slopes = linear_params.get("slopes", [])
                                     intercepts = linear_params.get("intercepts", [])
+
+                                    # T0 (starting lap) control
+                                    st.markdown("**Starting Lap (T0)**")
+                                    new_t0 = st.number_input("T0", value=int(t0), min_value=1, max_value=int(n_laps)-1, step=1, key=f"t0_{name}")
 
                                     # Transition points with number inputs (clickers)
                                     st.markdown("**Transition Points (Lap)**")
@@ -1241,7 +1247,7 @@ with tab2:
                                     cols_t = st.columns(len(transitions))
                                     for i, t in enumerate(transitions):
                                         with cols_t[i]:
-                                            new_t = st.number_input(f"T{i+1}", value=int(t), min_value=2, max_value=int(n_laps)-1, step=1, key=f"trans_{name}_{i}")
+                                            new_t = st.number_input(f"T{i+1}", value=int(t), min_value=int(new_t0)+1, max_value=int(n_laps)-1, step=1, key=f"trans_{name}_{i}")
                                             new_transitions.append(float(new_t))
 
                                     # Slopes with sliders in 2x2 layout
@@ -1259,7 +1265,7 @@ with tab2:
                                             if i == 0:
                                                 min_val, max_val = -0.5, 0.5
                                             else:
-                                                min_val, max_val = 0.0, 0.5
+                                                min_val, max_val = 0.0, 0.2
 
                                             step_size = 0.001
                                             fine_step = step_size  # Same step as slider for visible adjustments
@@ -1296,7 +1302,7 @@ with tab2:
                                             new_slopes.append(new_s)
 
                                     # Check if changed
-                                    if new_transitions != transitions or new_slopes != slopes:
+                                    if new_t0 != t0 or new_transitions != transitions or new_slopes != slopes:
                                         # Recalculate intercepts to maintain continuity
                                         new_intercepts = [intercepts[0]]  # Keep first intercept
                                         for i in range(1, len(new_slopes)):
@@ -1307,6 +1313,7 @@ with tab2:
                                             new_intercepts.append(new_int)
 
                                         st.session_state.model_linear_params[name] = {
+                                            "t0": float(new_t0),
                                             "transitions": new_transitions,
                                             "slopes": new_slopes,
                                             "intercepts": new_intercepts
