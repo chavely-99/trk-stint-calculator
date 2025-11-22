@@ -1280,8 +1280,25 @@ with tab2:
                                             step_size = (max_val - min_val) / 1000
                                             fine_step = step_size * 0.1  # Finer step for +/- buttons
 
-                                            # Get current value (from session state if adjusted, otherwise from slopes)
+                                            # Check if button was pressed and adjust value
+                                            if f"slope_btn_pressed_{name}_{i}" not in st.session_state:
+                                                st.session_state[f"slope_btn_pressed_{name}_{i}"] = False
+
+                                            # Get current value (from adjusted state or original)
                                             current_val = st.session_state[f"slope_adjust_{name}"].get(i, s)
+
+                                            # Create columns for fine-tuning buttons above slider
+                                            col_minus, col_plus = st.columns(2)
+                                            with col_minus:
+                                                if st.button("−", key=f"slope_minus_{name}_{i}", use_container_width=True):
+                                                    new_val = max(min_val, current_val - fine_step)
+                                                    st.session_state[f"slope_adjust_{name}"][i] = new_val
+                                                    st.rerun()
+                                            with col_plus:
+                                                if st.button("+", key=f"slope_plus_{name}_{i}", use_container_width=True):
+                                                    new_val = min(max_val, current_val + fine_step)
+                                                    st.session_state[f"slope_adjust_{name}"][i] = new_val
+                                                    st.rerun()
 
                                             # Slider with label
                                             new_s = st.slider(
@@ -1293,21 +1310,9 @@ with tab2:
                                                 format="%.4f",
                                                 key=f"slope_{name}_{i}"
                                             )
+
+                                            # Update the session state with slider value
                                             st.session_state[f"slope_adjust_{name}"][i] = new_s
-
-                                            # Create columns for fine-tuning buttons below slider
-                                            col_minus, col_plus = st.columns(2)
-                                            with col_minus:
-                                                if st.button("− Fine", key=f"slope_minus_{name}_{i}", use_container_width=True):
-                                                    new_val = max(min_val, current_val - fine_step)
-                                                    st.session_state[f"slope_adjust_{name}"][i] = new_val
-                                                    st.rerun()
-                                            with col_plus:
-                                                if st.button("+ Fine", key=f"slope_plus_{name}_{i}", use_container_width=True):
-                                                    new_val = min(max_val, current_val + fine_step)
-                                                    st.session_state[f"slope_adjust_{name}"][i] = new_val
-                                                    st.rerun()
-
                                             new_slopes.append(new_s)
 
                                     # Check if changed
