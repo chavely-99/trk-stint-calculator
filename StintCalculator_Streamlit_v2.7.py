@@ -1271,9 +1271,9 @@ with tab2:
                                                 min_val = -margin
                                                 max_val = margin
                                             else:
-                                                # For later segments, center around fitted slope with generous margin
+                                                # For later segments (degradation), minimum is 0, center around fitted slope with generous margin
                                                 margin = max(0.5, abs(s) * 5, max_possible_slope * 2)
-                                                min_val = s - margin
+                                                min_val = 0.0
                                                 max_val = s + margin
 
                                             # Ensure step size is appropriate for the range
