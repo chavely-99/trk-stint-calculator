@@ -63,25 +63,21 @@ details[open] {
 def falloff_equation(x: np.ndarray, a: float, b: float, c: float) -> np.ndarray:
     return a + b * (x ** -0.5) + c * ((x ** -0.5) * np.log(x))
 
-def piecewise_linear_equation(x: np.ndarray, transitions: List[float], slopes: List[float], intercepts: List[float], t0: float = 1.0) -> np.ndarray:
-    """Evaluate piecewise linear function at x values, starting from t0."""
+def piecewise_linear_equation(x: np.ndarray, transitions: List[float], slopes: List[float], intercepts: List[float]) -> np.ndarray:
+    """Evaluate piecewise linear function at x values."""
     result = np.zeros_like(x, dtype=float)
     transitions_sorted = sorted(transitions)
 
     for i, x_val in enumerate(x):
-        # For values before t0, use constant value at t0
-        if x_val < t0:
-            result[i] = slopes[0] * t0 + intercepts[0]
-        else:
-            # Find which segment this x belongs to
-            segment = 0
-            for t in transitions_sorted:
-                if x_val > t:
-                    segment += 1
-                else:
-                    break
+        # Find which segment this x belongs to
+        segment = 0
+        for t in transitions_sorted:
+            if x_val > t:
+                segment += 1
+            else:
+                break
 
-            result[i] = slopes[segment] * x_val + intercepts[segment]
+        result[i] = slopes[segment] * x_val + intercepts[segment]
 
     return result
 
@@ -156,17 +152,16 @@ def compute_effective_lap_time(
 ) -> float:
     # Check if we should use linear mode
     if use_linear and linear_params:
-        t0 = linear_params.get("t0", 1.0)
         transitions = linear_params.get("transitions", [])
         slopes = linear_params.get("slopes", [])
         intercepts = linear_params.get("intercepts", [])
-        raw = piecewise_linear_equation(np.array([float(stint_lap)]), transitions, slopes, intercepts, t0)[0]
+        raw = piecewise_linear_equation(np.array([float(stint_lap)]), transitions, slopes, intercepts)[0]
 
         if use_model_base:
             return float(raw)
         else:
             # Normalize using lap 3 as reference
-            base0 = piecewise_linear_equation(np.array([3.0]), transitions, slopes, intercepts, t0)[0]
+            base0 = piecewise_linear_equation(np.array([3.0]), transitions, slopes, intercepts)[0]
             return float(base + (raw - base0))
     else:
         # Use falloff equation
@@ -1121,11 +1116,10 @@ with tab2:
             if use_linear and model_name in st.session_state.model_linear_params:
                 # Use piecewise linear
                 linear_params = st.session_state.model_linear_params[model_name]
-                t0 = linear_params.get("t0", 1.0)
                 transitions = linear_params.get("transitions", [])
                 slopes = linear_params.get("slopes", [])
                 intercepts = linear_params.get("intercepts", [])
-                fy = piecewise_linear_equation(fx, transitions, slopes, intercepts, t0)
+                fy = piecewise_linear_equation(fx, transitions, slopes, intercepts)
             else:
                 # Use falloff curve
                 fy = falloff_equation(fx, a, b, c_)
@@ -1225,7 +1219,6 @@ with tab2:
                                     y_data = series_data.values.astype(float)
                                     transitions, slopes, intercepts = detect_transition_points(x_data, y_data)
                                     st.session_state.model_linear_params[name] = {
-                                        "t0": 1.0,  # Default starting lap
                                         "transitions": transitions,
                                         "slopes": slopes,
                                         "intercepts": intercepts
@@ -1238,14 +1231,9 @@ with tab2:
                                 if not linear_params:
                                     st.warning("No linear parameters detected yet.")
                                 else:
-                                    t0 = linear_params.get("t0", 1.0)
                                     transitions = linear_params.get("transitions", [])
                                     slopes = linear_params.get("slopes", [])
                                     intercepts = linear_params.get("intercepts", [])
-
-                                    # T0 (starting lap) control
-                                    st.markdown("**Starting Lap (T0)**")
-                                    new_t0 = st.number_input("T0", value=int(t0), min_value=1, max_value=int(n_laps)-1, step=1, key=f"t0_{name}")
 
                                     # Transition points with number inputs (clickers)
                                     st.markdown("**Transition Points (Lap)**")
@@ -1253,10 +1241,7 @@ with tab2:
                                     cols_t = st.columns(len(transitions))
                                     for i, t in enumerate(transitions):
                                         with cols_t[i]:
-                                            # Clamp transition value to valid range based on T0
-                                            min_allowed = int(new_t0) + 1
-                                            clamped_value = max(min_allowed, int(t))
-                                            new_t = st.number_input(f"T{i+1}", value=clamped_value, min_value=min_allowed, max_value=int(n_laps)-1, step=1, key=f"trans_{name}_{i}")
+                                            new_t = st.number_input(f"T{i+1}", value=int(t), min_value=2, max_value=int(n_laps)-1, step=1, key=f"trans_{name}_{i}")
                                             new_transitions.append(float(new_t))
 
                                     # Slopes with sliders in 2x2 layout
@@ -1272,7 +1257,7 @@ with tab2:
                                         with slope_rows[i % 2]:
                                             # Determine bounds
                                             if i == 0:
-                                                min_val, max_val = -0.5, 0.5
+                                                min_val, max_val = -2.0, 0.5
                                             else:
                                                 min_val, max_val = 0.0, 0.2
 
@@ -1311,7 +1296,7 @@ with tab2:
                                             new_slopes.append(new_s)
 
                                     # Check if changed
-                                    if new_t0 != t0 or new_transitions != transitions or new_slopes != slopes:
+                                    if new_transitions != transitions or new_slopes != slopes:
                                         # Recalculate intercepts to maintain continuity
                                         new_intercepts = [intercepts[0]]  # Keep first intercept
                                         for i in range(1, len(new_slopes)):
@@ -1322,7 +1307,6 @@ with tab2:
                                             new_intercepts.append(new_int)
 
                                         st.session_state.model_linear_params[name] = {
-                                            "t0": float(new_t0),
                                             "transitions": new_transitions,
                                             "slopes": new_slopes,
                                             "intercepts": new_intercepts
