@@ -63,21 +63,25 @@ details[open] {
 def falloff_equation(x: np.ndarray, a: float, b: float, c: float) -> np.ndarray:
     return a + b * (x ** -0.5) + c * ((x ** -0.5) * np.log(x))
 
-def piecewise_linear_equation(x: np.ndarray, transitions: List[float], slopes: List[float], intercepts: List[float]) -> np.ndarray:
-    """Evaluate piecewise linear function at x values."""
+def piecewise_linear_equation(x: np.ndarray, transitions: List[float], slopes: List[float], intercepts: List[float], t0: float = 1.0) -> np.ndarray:
+    """Evaluate piecewise linear function at x values, starting from t0."""
     result = np.zeros_like(x, dtype=float)
     transitions_sorted = sorted(transitions)
 
     for i, x_val in enumerate(x):
-        # Find which segment this x belongs to
-        segment = 0
-        for t in transitions_sorted:
-            if x_val > t:
-                segment += 1
-            else:
-                break
+        # For values before t0, use constant value at t0
+        if x_val < t0:
+            result[i] = slopes[0] * t0 + intercepts[0]
+        else:
+            # Find which segment this x belongs to
+            segment = 0
+            for t in transitions_sorted:
+                if x_val > t:
+                    segment += 1
+                else:
+                    break
 
-        result[i] = slopes[segment] * x_val + intercepts[segment]
+            result[i] = slopes[segment] * x_val + intercepts[segment]
 
     return result
 
@@ -152,16 +156,17 @@ def compute_effective_lap_time(
 ) -> float:
     # Check if we should use linear mode
     if use_linear and linear_params:
+        t0 = linear_params.get("t0", 1.0)
         transitions = linear_params.get("transitions", [])
         slopes = linear_params.get("slopes", [])
         intercepts = linear_params.get("intercepts", [])
-        raw = piecewise_linear_equation(np.array([float(stint_lap)]), transitions, slopes, intercepts)[0]
+        raw = piecewise_linear_equation(np.array([float(stint_lap)]), transitions, slopes, intercepts, t0)[0]
 
         if use_model_base:
             return float(raw)
         else:
             # Normalize using lap 3 as reference
-            base0 = piecewise_linear_equation(np.array([3.0]), transitions, slopes, intercepts)[0]
+            base0 = piecewise_linear_equation(np.array([3.0]), transitions, slopes, intercepts, t0)[0]
             return float(base + (raw - base0))
     else:
         # Use falloff equation
@@ -1116,10 +1121,11 @@ with tab2:
             if use_linear and model_name in st.session_state.model_linear_params:
                 # Use piecewise linear
                 linear_params = st.session_state.model_linear_params[model_name]
+                t0 = linear_params.get("t0", 1.0)
                 transitions = linear_params.get("transitions", [])
                 slopes = linear_params.get("slopes", [])
                 intercepts = linear_params.get("intercepts", [])
-                fy = piecewise_linear_equation(fx, transitions, slopes, intercepts)
+                fy = piecewise_linear_equation(fx, transitions, slopes, intercepts, t0)
             else:
                 # Use falloff curve
                 fy = falloff_equation(fx, a, b, c_)
