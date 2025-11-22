@@ -1283,29 +1283,27 @@ with tab2:
                                             # Get current value (from session state if adjusted, otherwise from slopes)
                                             current_val = st.session_state[f"slope_adjust_{name}"].get(i, s)
 
-                                            # Create columns: [-] [slider] [+]
-                                            col_minus, col_slider, col_plus = st.columns([0.5, 8, 0.5])
+                                            # Slider with label
+                                            new_s = st.slider(
+                                                f"Segment {i+1}",
+                                                min_value=float(min_val),
+                                                max_value=float(max_val),
+                                                value=float(current_val),
+                                                step=float(step_size),
+                                                format="%.4f",
+                                                key=f"slope_{name}_{i}"
+                                            )
+                                            st.session_state[f"slope_adjust_{name}"][i] = new_s
 
+                                            # Create columns for fine-tuning buttons below slider
+                                            col_minus, col_plus = st.columns(2)
                                             with col_minus:
-                                                if st.button("−", key=f"slope_minus_{name}_{i}"):
+                                                if st.button("− Fine", key=f"slope_minus_{name}_{i}", use_container_width=True):
                                                     new_val = max(min_val, current_val - fine_step)
                                                     st.session_state[f"slope_adjust_{name}"][i] = new_val
                                                     st.rerun()
-
-                                            with col_slider:
-                                                new_s = st.slider(
-                                                    f"Segment {i+1}",
-                                                    min_value=float(min_val),
-                                                    max_value=float(max_val),
-                                                    value=float(current_val),
-                                                    step=float(step_size),
-                                                    format="%.4f",
-                                                    key=f"slope_{name}_{i}"
-                                                )
-                                                st.session_state[f"slope_adjust_{name}"][i] = new_s
-
                                             with col_plus:
-                                                if st.button("+", key=f"slope_plus_{name}_{i}"):
+                                                if st.button("+ Fine", key=f"slope_plus_{name}_{i}", use_container_width=True):
                                                     new_val = min(max_val, current_val + fine_step)
                                                     st.session_state[f"slope_adjust_{name}"][i] = new_val
                                                     st.rerun()
