@@ -1278,11 +1278,7 @@ with tab2:
 
                                             # Ensure step size is appropriate for the range
                                             step_size = (max_val - min_val) / 1000
-                                            fine_step = step_size * 0.1  # Finer step for +/- buttons
-
-                                            # Check if button was pressed and adjust value
-                                            if f"slope_btn_pressed_{name}_{i}" not in st.session_state:
-                                                st.session_state[f"slope_btn_pressed_{name}_{i}"] = False
+                                            fine_step = step_size  # Same step as slider for visible adjustments
 
                                             # Get current value (from adjusted state or original)
                                             current_val = st.session_state[f"slope_adjust_{name}"].get(i, s)
@@ -1290,12 +1286,12 @@ with tab2:
                                             # Create columns for fine-tuning buttons above slider
                                             col_minus, col_plus = st.columns(2)
                                             with col_minus:
-                                                if st.button("−", key=f"slope_minus_{name}_{i}", use_container_width=True):
+                                                if st.button("- Decrease", key=f"slope_minus_{name}_{i}", use_container_width=True):
                                                     new_val = max(min_val, current_val - fine_step)
                                                     st.session_state[f"slope_adjust_{name}"][i] = new_val
                                                     st.rerun()
                                             with col_plus:
-                                                if st.button("+", key=f"slope_plus_{name}_{i}", use_container_width=True):
+                                                if st.button("+ Increase", key=f"slope_plus_{name}_{i}", use_container_width=True):
                                                     new_val = min(max_val, current_val + fine_step)
                                                     st.session_state[f"slope_adjust_{name}"][i] = new_val
                                                     st.rerun()
