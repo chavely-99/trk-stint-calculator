@@ -1247,7 +1247,10 @@ with tab2:
                                     cols_t = st.columns(len(transitions))
                                     for i, t in enumerate(transitions):
                                         with cols_t[i]:
-                                            new_t = st.number_input(f"T{i+1}", value=int(t), min_value=int(new_t0)+1, max_value=int(n_laps)-1, step=1, key=f"trans_{name}_{i}")
+                                            # Clamp transition value to valid range based on T0
+                                            min_allowed = int(new_t0) + 1
+                                            clamped_value = max(min_allowed, int(t))
+                                            new_t = st.number_input(f"T{i+1}", value=clamped_value, min_value=min_allowed, max_value=int(n_laps)-1, step=1, key=f"trans_{name}_{i}")
                                             new_transitions.append(float(new_t))
 
                                     # Slopes with sliders in 2x2 layout
