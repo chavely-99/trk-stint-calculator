@@ -1250,18 +1250,36 @@ with tab2:
                                     slope_rows = st.columns(2)
                                     for i, s in enumerate(slopes):
                                         with slope_rows[i % 2]:
-                                            # Determine bounds
+                                            # Dynamically determine bounds based on the fitted slope
+                                            # Calculate data-driven range for more flexibility
+                                            series_data = pd.to_numeric(st.session_state.model_table[name], errors="coerce").dropna()
+                                            y_data = series_data.values.astype(float)
+                                            data_range = y_data.max() - y_data.min()
+                                            n_laps = len(y_data)
+
+                                            # Estimate a reasonable slope range based on data characteristics
+                                            max_possible_slope = abs(data_range / max(1, n_laps - 1))
+
+                                            # For first segment, allow both positive and negative slopes
                                             if i == 0:
-                                                min_val, max_val = -0.5, 0.5
+                                                margin = max(1.0, max_possible_slope * 3)
+                                                min_val = -margin
+                                                max_val = margin
                                             else:
-                                                min_val, max_val = 0.0, 0.1
+                                                # For later segments, center around fitted slope with generous margin
+                                                margin = max(0.5, abs(s) * 5, max_possible_slope * 2)
+                                                min_val = s - margin
+                                                max_val = s + margin
+
+                                            # Ensure step size is appropriate for the range
+                                            step_size = (max_val - min_val) / 1000
 
                                             new_s = st.slider(
                                                 f"Segment {i+1}",
-                                                min_value=min_val,
-                                                max_value=max_val,
+                                                min_value=float(min_val),
+                                                max_value=float(max_val),
                                                 value=float(s),
-                                                step=0.001,  # Coarser step
+                                                step=float(step_size),
                                                 format="%.4f",
                                                 key=f"slope_{name}_{i}"
                                             )
