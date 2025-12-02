@@ -15,7 +15,11 @@ import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 
 APP_TITLE = "TRK – Stint Calculator"
-st.set_page_config(page_title=APP_TITLE, layout="wide")
+st.set_page_config(
+    page_title=APP_TITLE,
+    page_icon="TH_FullLogo_White.png",
+    layout="wide"
+)
 
 # ---- compact top spacing ----
 st.markdown(
@@ -38,8 +42,8 @@ DEFAULT_CAR_COLORS: Dict[str, str] = {
     "3": "#4B5563",
     "8": "#BDBDBD",
     "24": "#F59E0B",
-    "88": "#FFD700",
-    "99": "#003FFF",
+    "97": "#FFD700",
+    "88": "#003FFF",
     "48": "#2E7D32",
 }
 st.markdown("""
