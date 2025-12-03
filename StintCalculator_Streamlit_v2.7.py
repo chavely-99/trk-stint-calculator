@@ -134,6 +134,47 @@ def detect_transition_points(x: np.ndarray, y: np.ndarray, n_transitions: int = 
 
     return transitions_sorted, slopes, intercepts
 
+def refit_linear_segments(x: np.ndarray, y: np.ndarray, transitions: List[float]) -> Tuple[List[float], List[float]]:
+    """Refit linear segments to data given fixed transition points.
+
+    Returns slopes and intercepts that best fit the data within each segment.
+    """
+    transitions_sorted = sorted(transitions)
+    boundaries = [0] + [np.searchsorted(x, t) for t in transitions_sorted] + [len(x)]
+
+    slopes = []
+    intercepts = []
+
+    for i in range(len(boundaries) - 1):
+        start_idx = boundaries[i]
+        end_idx = boundaries[i + 1]
+
+        if end_idx > start_idx:
+            x_seg = x[start_idx:end_idx]
+            y_seg = y[start_idx:end_idx]
+
+            if len(x_seg) > 1:
+                # Use least squares fit for the segment
+                slope = (y_seg[-1] - y_seg[0]) / (x_seg[-1] - x_seg[0]) if x_seg[-1] != x_seg[0] else 0
+                intercept = y_seg[0] - slope * x_seg[0]
+            else:
+                slope = 0
+                intercept = y_seg[0] if len(y_seg) > 0 else 0
+        else:
+            slope = 0
+            intercept = 0
+
+        slopes.append(slope)
+        intercepts.append(intercept)
+
+    # Ensure continuity at transition points by adjusting intercepts
+    for i in range(1, len(slopes)):
+        t = transitions_sorted[i - 1]
+        y_at_t = slopes[i - 1] * t + intercepts[i - 1]
+        intercepts[i] = y_at_t - slopes[i] * t
+
+    return slopes, intercepts
+
 def fit_falloff_linear_ls(x: np.ndarray, y: np.ndarray) -> Tuple[float, float, float]:
     x = x.astype(float)
     y = y.astype(float)
@@ -1239,8 +1280,13 @@ with tab2:
                                     slopes = linear_params.get("slopes", [])
                                     intercepts = linear_params.get("intercepts", [])
 
+                                    # Get original data for refitting
+                                    series_data = pd.to_numeric(st.session_state.model_table[name], errors="coerce").dropna()
+                                    x_data = np.arange(1, len(series_data) + 1, dtype=float)
+                                    y_data = series_data.values.astype(float)
+
                                     # Transition points with number inputs (clickers)
-                                    st.markdown("**Transition Points (Lap)**")
+                                    st.markdown("**Transition Points (Lap)** - *adjusts curve automatically*")
                                     new_transitions = []
                                     cols_t = st.columns(len(transitions))
                                     for i, t in enumerate(transitions):
@@ -1248,8 +1294,23 @@ with tab2:
                                             new_t = st.number_input(f"T{i+1}", value=int(t), min_value=2, max_value=int(n_laps)-1, step=1, key=f"trans_{name}_{i}")
                                             new_transitions.append(float(new_t))
 
-                                    # Slopes with sliders in 2x2 layout
-                                    st.markdown("**Slopes (s/lap)**")
+                                    # Check if transitions changed - auto-refit if so
+                                    transitions_changed = new_transitions != transitions
+                                    if transitions_changed:
+                                        # Auto-refit the linear segments to the data
+                                        new_slopes, new_intercepts = refit_linear_segments(x_data, y_data, new_transitions)
+                                        st.session_state.model_linear_params[name] = {
+                                            "transitions": new_transitions,
+                                            "slopes": new_slopes,
+                                            "intercepts": new_intercepts
+                                        }
+                                        # Clear any manual slope adjustments
+                                        if f"slope_adjust_{name}" in st.session_state:
+                                            del st.session_state[f"slope_adjust_{name}"]
+                                        st.rerun()
+
+                                    # Slopes with number inputs and +/- buttons in 2x2 layout
+                                    st.markdown("**Slopes (s/lap)** - *fine-tune if needed*")
                                     new_slopes = []
                                     slope_rows = st.columns(2)
 
@@ -1259,48 +1320,40 @@ with tab2:
 
                                     for i, s in enumerate(slopes):
                                         with slope_rows[i % 2]:
-                                            # Determine bounds
-                                            if i == 0:
-                                                min_val, max_val = -2.0, 0.5
-                                            else:
-                                                min_val, max_val = 0.0, 0.2
-
                                             step_size = 0.001
-                                            fine_step = step_size  # Same step as slider for visible adjustments
 
                                             # Get current value (from adjusted state or original)
                                             current_val = st.session_state[f"slope_adjust_{name}"].get(i, s)
 
-                                            # Create columns for fine-tuning buttons above slider
-                                            col_minus, col_plus = st.columns(2)
+                                            st.markdown(f"**Seg {i+1}**")
+                                            # Create columns: minus button, number input, plus button
+                                            col_minus, col_input, col_plus = st.columns([1, 2, 1])
                                             with col_minus:
-                                                if st.button("- Decrease", key=f"slope_minus_{name}_{i}", use_container_width=True):
-                                                    new_val = max(min_val, current_val - fine_step)
+                                                if st.button("−", key=f"slope_minus_{name}_{i}", use_container_width=True):
+                                                    new_val = current_val - step_size
                                                     st.session_state[f"slope_adjust_{name}"][i] = new_val
                                                     st.rerun()
+                                            with col_input:
+                                                new_s = st.number_input(
+                                                    f"Slope {i+1}",
+                                                    value=float(current_val),
+                                                    step=float(step_size),
+                                                    format="%.4f",
+                                                    key=f"slope_{name}_{i}",
+                                                    label_visibility="collapsed"
+                                                )
                                             with col_plus:
-                                                if st.button("+ Increase", key=f"slope_plus_{name}_{i}", use_container_width=True):
-                                                    new_val = min(max_val, current_val + fine_step)
+                                                if st.button("+", key=f"slope_plus_{name}_{i}", use_container_width=True):
+                                                    new_val = current_val + step_size
                                                     st.session_state[f"slope_adjust_{name}"][i] = new_val
                                                     st.rerun()
 
-                                            # Slider with label
-                                            new_s = st.slider(
-                                                f"Segment {i+1}",
-                                                min_value=float(min_val),
-                                                max_value=float(max_val),
-                                                value=float(current_val),
-                                                step=float(step_size),
-                                                format="%.4f",
-                                                key=f"slope_{name}_{i}"
-                                            )
-
-                                            # Update the session state with slider value
+                                            # Update the session state with input value
                                             st.session_state[f"slope_adjust_{name}"][i] = new_s
                                             new_slopes.append(new_s)
 
-                                    # Check if changed
-                                    if new_transitions != transitions or new_slopes != slopes:
+                                    # Check if slopes changed (transitions already handled above)
+                                    if new_slopes != slopes:
                                         # Recalculate intercepts to maintain continuity
                                         new_intercepts = [intercepts[0]]  # Keep first intercept
                                         for i in range(1, len(new_slopes)):
