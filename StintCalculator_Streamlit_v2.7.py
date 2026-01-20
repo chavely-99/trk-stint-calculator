@@ -4,7 +4,6 @@
 
 import io
 import json
-import random
 from typing import Dict, List, Tuple, Optional
 from string import Template
 
@@ -1048,9 +1047,7 @@ with tab1:
                             st.session_state.model_table.loc[:needed - 1, target_name] = [
                                 round(float(v), 3) for v in clean
                             ]
-                            # Set random color
-                            random_color = "#{:06x}".format(random.randint(0, 0xFFFFFF))
-                            st.session_state.model_colors[target_name] = random_color
+                            # Assign color from palette (will be assigned by _ensure_color on first render)
                             st.success(f"Created and exported {needed} rows into new model '{target_name}'.")
                             st.rerun()
 
@@ -1184,9 +1181,25 @@ with tab2:
     with left:
         rows = []
 
+        # Distinct color palette for models - visually distinct and appealing
+        MODEL_PALETTE = [
+            "#1f77b4",  # blue
+            "#ff7f0e",  # orange
+            "#2ca02c",  # green
+            "#d62728",  # red
+            "#9467bd",  # purple
+            "#8c564b",  # brown
+            "#e377c2",  # pink
+            "#17becf",  # cyan
+            "#bcbd22",  # olive
+            "#7f7f7f",  # gray
+        ]
+
         def _ensure_color(name: str) -> str:
             if name not in st.session_state.model_colors:
-                st.session_state.model_colors[name] = "#1f77b4"
+                # Assign next color from palette based on how many models exist
+                idx = len(st.session_state.model_colors) % len(MODEL_PALETTE)
+                st.session_state.model_colors[name] = MODEL_PALETTE[idx]
             return st.session_state.model_colors[name]
 
         for model_name, params in st.session_state.model_params.items():
