@@ -1208,6 +1208,11 @@ with tab2:
                 max_x = max(len(series), max(transitions) if transitions else len(series))
                 fx = np.linspace(1, max_x, 300)
                 fy = piecewise_linear_equation(fx, transitions, slopes, intercepts)
+
+                # Add transition point markers
+                for t in transitions:
+                    t_y = piecewise_linear_equation(np.array([float(t)]), transitions, slopes, intercepts)[0]
+                    rows.append({"Series": model_name, "Kind": "transition", "x": float(t), "y": float(t_y), "color": color})
             else:
                 # Use falloff curve
                 fx = np.linspace(1, len(series), 200)
@@ -1235,7 +1240,11 @@ with tab2:
             )
             line = base.transform_filter(alt.datum.Kind == "fit").mark_line()
             pts  = base.transform_filter(alt.datum.Kind == "data").mark_point()
-            st.altair_chart((line + pts).properties(height=540), width="stretch")
+            # Transition point markers - larger diamonds
+            trans_pts = base.transform_filter(alt.datum.Kind == "transition").mark_point(
+                shape="diamond", size=150, filled=True, stroke="white", strokeWidth=1
+            )
+            st.altair_chart((line + pts + trans_pts).properties(height=540), width="stretch")
         else:
             st.info("Fit models to see a plot.")
 
