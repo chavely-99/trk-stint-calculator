@@ -1361,20 +1361,20 @@ with tab2:
                                             "slopes": new_slopes,
                                             "intercepts": new_intercepts
                                         }
-                                        # Clear cached slope widget values so they update
-                                        for i in range(len(new_slopes)):
-                                            slope_key = f"slope_{name}_{i}"
-                                            if slope_key in st.session_state:
-                                                del st.session_state[slope_key]
+                                        # Increment version to force slope widgets to reset
+                                        ver_key = f"_slope_version_{name}"
+                                        st.session_state[ver_key] = st.session_state.get(ver_key, 0) + 1
                                         st.rerun()
 
                                     # Slopes in 2x2 grid with number inputs (matching transition style)
                                     st.markdown("**Slopes (s/lap)** - *fine-tune if needed*")
                                     slope_rows = st.columns(2)
                                     new_slopes = []
+                                    # Use version in key so widgets reset when transitions change
+                                    slope_ver = st.session_state.get(f"_slope_version_{name}", 0)
                                     for i, s in enumerate(slopes):
                                         with slope_rows[i % 2]:
-                                            new_s = st.number_input(f"Seg {i+1}", value=float(s), step=0.001, format="%.4f", key=f"slope_{name}_{i}")
+                                            new_s = st.number_input(f"Seg {i+1}", value=float(s), step=0.001, format="%.4f", key=f"slope_{name}_{i}_v{slope_ver}")
                                             new_slopes.append(new_s)
 
                                     # Check if slopes changed - recalculate intercepts for continuity
