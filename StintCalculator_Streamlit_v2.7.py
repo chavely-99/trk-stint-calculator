@@ -66,6 +66,10 @@ details[open] {
   font-size: 0.8rem !important;
   line-height: 1 !important;
 }
+/* Center Color column in data_editor */
+[data-testid="stDataEditor"] td:nth-child(2) {
+  text-align: center !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1899,7 +1903,7 @@ with tab3:
                         use_container_width=True,
                         column_config={
                             "Show": st.column_config.CheckboxColumn("👁", help="Show on plot", default=True, width="small"),
-                            "Color": st.column_config.TextColumn("", disabled=True, width="small"),
+                            "Color": st.column_config.TextColumn("", disabled=True),
                             "Strategy": st.column_config.TextColumn("Strategy", disabled=True),
                             "Pre | Post": st.column_config.TextColumn("Pre | Post", disabled=True),
                             "Pit Stops": st.column_config.TextColumn("Pit Stops", disabled=True),
