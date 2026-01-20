@@ -1320,82 +1320,28 @@ with tab2:
                                             del st.session_state[f"slope_adjust_{name}"]
                                         st.rerun()
 
-                                    # Slopes with number inputs and +/- buttons in 2x2 layout
+                                    # Slopes in 2x2 grid with number inputs (matching transition style)
                                     st.markdown("**Slopes (s/lap)** - *fine-tune if needed*")
                                     slope_rows = st.columns(2)
-                                    step_size = 0.001
-
-                                    # Create a key suffix based on transitions AND slopes so widgets reset properly
-                                    trans_key = "_".join([str(int(t)) for t in transitions])
-                                    slope_key = "_".join([f"{s:.4f}" for s in slopes])
-                                    widget_key = f"{trans_key}_{slope_key}"
-
+                                    new_slopes = []
                                     for i, s in enumerate(slopes):
                                         with slope_rows[i % 2]:
-                                            st.markdown(f"**Seg {i+1}**")
-                                            # Create columns: minus button, number input, plus button
-                                            col_minus, col_input, col_plus = st.columns([1, 2, 1])
+                                            new_s = st.number_input(f"Seg {i+1}", value=float(s), step=0.001, format="%.4f", key=f"slope_{name}_{i}")
+                                            new_slopes.append(new_s)
 
-                                            # Handle button clicks - update model_linear_params directly
-                                            with col_minus:
-                                                if st.button("−", key=f"slope_minus_{name}_{i}_{widget_key}", use_container_width=True):
-                                                    updated_slopes = list(slopes)
-                                                    updated_slopes[i] = s - step_size
-                                                    # Recalculate intercepts for continuity
-                                                    new_intercepts = [intercepts[0]]
-                                                    for j in range(1, len(updated_slopes)):
-                                                        t = transitions[j-1]
-                                                        y_at_t = updated_slopes[j-1] * t + new_intercepts[j-1]
-                                                        new_intercepts.append(y_at_t - updated_slopes[j] * t)
-                                                    st.session_state.model_linear_params[name] = {
-                                                        "transitions": transitions,
-                                                        "slopes": updated_slopes,
-                                                        "intercepts": new_intercepts
-                                                    }
-                                                    st.rerun()
-
-                                            with col_input:
-                                                new_s = st.number_input(
-                                                    f"Slope {i+1}",
-                                                    value=float(s),
-                                                    step=float(step_size),
-                                                    format="%.4f",
-                                                    key=f"slope_{name}_{i}_{widget_key}",
-                                                    label_visibility="collapsed"
-                                                )
-                                                # Only update if user typed a new value (not just widget re-render)
-                                                if abs(new_s - s) > 1e-6:
-                                                    updated_slopes = list(slopes)
-                                                    updated_slopes[i] = new_s
-                                                    # Recalculate intercepts for continuity
-                                                    new_intercepts = [intercepts[0]]
-                                                    for j in range(1, len(updated_slopes)):
-                                                        t = transitions[j-1]
-                                                        y_at_t = updated_slopes[j-1] * t + new_intercepts[j-1]
-                                                        new_intercepts.append(y_at_t - updated_slopes[j] * t)
-                                                    st.session_state.model_linear_params[name] = {
-                                                        "transitions": transitions,
-                                                        "slopes": updated_slopes,
-                                                        "intercepts": new_intercepts
-                                                    }
-                                                    st.rerun()
-
-                                            with col_plus:
-                                                if st.button("＋", key=f"slope_plus_{name}_{i}_{widget_key}", use_container_width=True):
-                                                    updated_slopes = list(slopes)
-                                                    updated_slopes[i] = s + step_size
-                                                    # Recalculate intercepts for continuity
-                                                    new_intercepts = [intercepts[0]]
-                                                    for j in range(1, len(updated_slopes)):
-                                                        t = transitions[j-1]
-                                                        y_at_t = updated_slopes[j-1] * t + new_intercepts[j-1]
-                                                        new_intercepts.append(y_at_t - updated_slopes[j] * t)
-                                                    st.session_state.model_linear_params[name] = {
-                                                        "transitions": transitions,
-                                                        "slopes": updated_slopes,
-                                                        "intercepts": new_intercepts
-                                                    }
-                                                    st.rerun()
+                                    # Check if slopes changed - recalculate intercepts for continuity
+                                    if new_slopes != slopes:
+                                        new_intercepts = [intercepts[0]]
+                                        for j in range(1, len(new_slopes)):
+                                            t = transitions[j-1]
+                                            y_at_t = new_slopes[j-1] * t + new_intercepts[j-1]
+                                            new_intercepts.append(y_at_t - new_slopes[j] * t)
+                                        st.session_state.model_linear_params[name] = {
+                                            "transitions": transitions,
+                                            "slopes": new_slopes,
+                                            "intercepts": new_intercepts
+                                        }
+                                        st.rerun()
 
             # Handle visibility changes
             if visibility_changed:
