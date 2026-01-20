@@ -1091,7 +1091,12 @@ with tab1:
 
 # ---------------- TAB 2 ----------------
 with tab2:
-    st.subheader("Data & Fitting")
+    _header_col, _refresh_col = st.columns([10, 1])
+    with _header_col:
+        st.subheader("Data & Fitting")
+    with _refresh_col:
+        if st.button("🔄", key="refresh_tab2", help="Refresh data"):
+            st.rerun()
 
     if "model_table" not in st.session_state:
         st.session_state.model_table = pd.DataFrame()
