@@ -59,6 +59,13 @@ st.markdown("""
 details[open] {
   margin-bottom: 0.5rem !important;
 }
+/* Compact icon buttons in strategy table */
+[data-testid="column"] button[kind="secondary"] {
+  padding: 0.15rem 0.4rem !important;
+  min-height: 1.5rem !important;
+  font-size: 0.8rem !important;
+  line-height: 1 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
