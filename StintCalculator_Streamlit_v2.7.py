@@ -1863,35 +1863,47 @@ with tab3:
             # ---------- table ----------
             with left:
                 # Header row
-                h_cols = st.columns([0.06, 0.36, 0.34, 0.24, 0.12, 0.12, 0.10], vertical_alignment="center")
+                h_cols = st.columns([0.06, 0.30, 0.30, 0.20, 0.12, 0.12, 0.06, 0.06], vertical_alignment="center")
                 h_cols[0].write("")
                 h_cols[1].markdown("**Strategy Name**")
                 h_cols[2].markdown("**Pre | Post Model**")
                 h_cols[3].markdown("**Pit Stops**")
                 h_cols[4].markdown("**Total (s)**")
                 h_cols[5].markdown("**Δ (s)**")
-                h_cols[6].write("")
+                h_cols[7].write("")
                 delete_indices = []
                 for i, stg in enumerate(strategies):
+                    # Initialize visibility if not set
+                    if "visible" not in stg:
+                        stg["visible"] = True
+                    is_visible = stg.get("visible", True)
                     delta = (stg["total_time"] - best_time) if (best_time is not None and np.isfinite(stg["total_time"])) else None
-                    cols = st.columns([0.06, 0.36, 0.34, 0.24, 0.12, 0.12, 0.10])
+                    cols = st.columns([0.06, 0.30, 0.30, 0.20, 0.12, 0.12, 0.06, 0.06])
+                    # Color swatch - dim if hidden
+                    opacity = "1.0" if is_visible else "0.3"
                     cols[0].markdown(
-                        f"<div style='width:14px;height:14px;border-radius:4px;background:{colors[i]};'></div>",
+                        f"<div style='width:14px;height:14px;border-radius:4px;background:{colors[i]};opacity:{opacity};'></div>",
                         unsafe_allow_html=True,
                     )
-                    cols[1].markdown(stg['name'])
-                    cols[2].markdown(f"{stg.get('pre_model','?')} | {stg.get('post_model','?')}")
-                    cols[3].markdown(f"{stg['pit_stops']}")
+                    text_style = "" if is_visible else "opacity: 0.5;"
+                    cols[1].markdown(f"<span style='{text_style}'>{stg['name']}</span>", unsafe_allow_html=True)
+                    cols[2].markdown(f"<span style='{text_style}'>{stg.get('pre_model','?')} | {stg.get('post_model','?')}</span>", unsafe_allow_html=True)
+                    cols[3].markdown(f"<span style='{text_style}'>{stg['pit_stops']}</span>", unsafe_allow_html=True)
                     if np.isfinite(stg["total_time"]):
-                        cols[4].markdown(f"{stg['total_time']:.1f}")
+                        cols[4].markdown(f"<span style='{text_style}'>{stg['total_time']:.1f}</span>", unsafe_allow_html=True)
                         if delta is not None:
-                            cols[5].markdown(f"{delta:.1f}")
+                            cols[5].markdown(f"<span style='{text_style}'>{delta:.1f}</span>", unsafe_allow_html=True)
                         else:
-                            cols[5].markdown("—")
+                            cols[5].markdown(f"<span style='{text_style}'>—</span>", unsafe_allow_html=True)
                     else:
-                        cols[4].markdown("—")
-                        cols[5].markdown("—")
-                    if cols[6].button("🗑️", key=f"del_{tab_idx}_{i}"):
+                        cols[4].markdown(f"<span style='{text_style}'>—</span>", unsafe_allow_html=True)
+                        cols[5].markdown(f"<span style='{text_style}'>—</span>", unsafe_allow_html=True)
+                    # Visibility toggle
+                    eye_icon = "👁️" if is_visible else "👁️‍🗨️"
+                    if cols[6].button(eye_icon, key=f"vis_{tab_idx}_{i}"):
+                        stg["visible"] = not is_visible
+                        st.rerun()
+                    if cols[7].button("🗑️", key=f"del_{tab_idx}_{i}"):
                         delete_indices.append(i)
                 if delete_indices:
                     for idx in sorted(delete_indices, reverse=True):
@@ -1900,28 +1912,32 @@ with tab3:
 
                 # ---------- Δ vs best plot (colors per row; no cross-connecting) ----------
                 drows = []
-                # choose baseline = min total_time
-                best_idx = int(np.argmin([stg["total_time"] for stg in strategies]))
-                sb = strategies[best_idx]
-                sb_s = int(sb.get("start_lap", s)); sb_e = int(sb.get("end_lap", e))
-                base_x = np.arange(sb_s, sb_e + 1, dtype=int)
-                base_cum = np.array(sb["cum_times"], dtype=float)
+                # Filter to visible strategies only
+                visible_strategies = [(i, stg) for i, stg in enumerate(strategies) if stg.get("visible", True)]
+                if visible_strategies:
+                    # choose baseline = min total_time among visible
+                    visible_times = [stg["total_time"] for _, stg in visible_strategies]
+                    best_vis_idx = int(np.argmin(visible_times))
+                    _, sb = visible_strategies[best_vis_idx]
+                    sb_s = int(sb.get("start_lap", s)); sb_e = int(sb.get("end_lap", e))
+                    base_x = np.arange(sb_s, sb_e + 1, dtype=int)
+                    base_cum = np.array(sb["cum_times"], dtype=float)
 
-                for i, stg in enumerate(strategies):
-                    s_row = int(stg.get("start_lap", s)); e_row = int(stg.get("end_lap", e))
-                    x_vals = np.arange(s_row, e_row + 1, dtype=int)
-                    cum = np.array(stg["cum_times"], dtype=float)
+                    for i, stg in visible_strategies:
+                        s_row = int(stg.get("start_lap", s)); e_row = int(stg.get("end_lap", e))
+                        x_vals = np.arange(s_row, e_row + 1, dtype=int)
+                        cum = np.array(stg["cum_times"], dtype=float)
 
-                    lo = max(s_row, sb_s); hi = min(e_row, sb_e)
-                    if lo > hi:  # no overlap -> skip
-                        continue
-                    ia = (x_vals >= lo) & (x_vals <= hi)
-                    ib = (base_x >= lo) & (base_x <= hi)
-                    diff = cum[ia] - base_cum[ib]
+                        lo = max(s_row, sb_s); hi = min(e_row, sb_e)
+                        if lo > hi:  # no overlap -> skip
+                            continue
+                        ia = (x_vals >= lo) & (x_vals <= hi)
+                        ib = (base_x >= lo) & (base_x <= hi)
+                        diff = cum[ia] - base_cum[ib]
 
-                    key = series_keys[i]
-                    for xv, dv in zip(np.arange(lo, hi + 1, dtype=int), diff):
-                        drows.append({"Lap": int(xv), "Δ vs Best (s)": float(dv), "SeriesKey": key})
+                        key = series_keys[i]
+                        for xv, dv in zip(np.arange(lo, hi + 1, dtype=int), diff):
+                            drows.append({"Lap": int(xv), "Δ vs Best (s)": float(dv), "SeriesKey": key})
 
                 if drows:
                     ddf = pd.DataFrame(drows)
