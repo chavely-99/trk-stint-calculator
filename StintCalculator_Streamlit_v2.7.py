@@ -1959,33 +1959,34 @@ with tab3:
                         [int(desired)], s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, base_default, use_model_base
                     )
                     rows = []
-                    for k in range(1, 11):
-                        pitlap = int(desired) - k
-                        if pitlap <= s: continue
-                        tot_early, _ = compute_total_time_and_laps_dual_model(
+                    # Offsets: -10, -5, -4, -3, -2, -1, 0 (even), +1, +2, +3, +4, +5, +10
+                    offsets = [-10, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 10]
+                    for offset in offsets:
+                        pitlap = int(desired) + offset
+                        if pitlap <= s or pitlap >= e: continue
+                        tot, _ = compute_total_time_and_laps_dual_model(
                             [pitlap], s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, base_default, use_model_base
                         )
-                        init_gain = 0.0
-                        if desired >= pitlap + 1:
-                            for L in range(pitlap + 1, desired + 1):
-                                lt_base  = compute_effective_lap_time(L - s + 1, a1, b1, c1_, base_default, use_model_base)
-                                lt_early = compute_effective_lap_time(L - pitlap,   a2, b2, c2_, base_default, use_model_base)
-                                init_gain += (lt_base - lt_early)
-                        final_delta = tot_early - base_total
-                        rows.append({"Earlier by": k, "Pit Lap": pitlap,
-                                     "Initial Gain (s)": round(float(-init_gain), 2),
+                        final_delta = tot - base_total
+                        # Label for offset
+                        if offset < 0:
+                            label = f"{-offset} early"
+                        elif offset > 0:
+                            label = f"{offset} late"
+                        else:
+                            label = "even"
+                        rows.append({"Offset": label, "Pit Lap": pitlap,
                                      "Final Δ (s)": round(float(final_delta), 2)})
                     if rows:
                         wdf = pd.DataFrame(rows)
                         st.dataframe(
                             wdf, hide_index=True, width="stretch",
                             column_config={
-                                "Initial Gain (s)": st.column_config.NumberColumn(format="%.2f"),
                                 "Final Δ (s)": st.column_config.NumberColumn(format="%.2f"),
                             }
                         )
                     else:
-                        st.info("Pick a later desired lap.")
+                        st.info("Adjust desired lap for valid range.")
         else:
             st.info("Add strategies to see results.")
 
