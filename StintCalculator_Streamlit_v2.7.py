@@ -699,31 +699,46 @@ with tab1:
 
                     stints = det_map.get(car, [])
                     labels = [f"L{s}-L{e}" for (s, e) in stints]
-                    opts = ["— Select —"] + labels
+                    opts = ["— Select —", "Custom"] + labels
 
+                    # Check if current manual range matches a detected stint
+                    cur_range = st.session_state.car_ranges.get(car)
+                    matching_stint_idx = None
+                    if cur_range:
+                        for si, (ss, se) in enumerate(stints):
+                            if (int(ss), int(se)) == (int(cur_range[0]), int(cur_range[1])):
+                                matching_stint_idx = si
+                                break
+
+                    # Determine default index
                     prior_val_key = f"gf_pick_{car}"
-                    prev_choice_key = f"_prev_gf_pick_{car}"
-
-                    if prior_val_key in st.session_state and st.session_state[prior_val_key] in opts:
-                        default_index = opts.index(st.session_state[prior_val_key])
+                    if matching_stint_idx is not None:
+                        default_index = matching_stint_idx + 2  # +2 for "— Select —" and "Custom"
+                    elif cur_range and prior_val_key in st.session_state:
+                        # Has a range but doesn't match any stint - show Custom
+                        default_index = 1  # Custom
+                    elif stints:
+                        default_index = 2  # First stint
                     else:
-                        default_index = 1 if stints else 0
+                        default_index = 0  # — Select —
 
                     choice = col.selectbox(f"Car {car}", opts, index=default_index, key=prior_val_key)
 
-                    # Only update car_ranges if user actually changed the dropdown
+                    # Handle selection changes
+                    prev_choice_key = f"_prev_gf_pick_{car}"
                     prev_choice = st.session_state.get(prev_choice_key)
                     if choice != prev_choice:
                         st.session_state[prev_choice_key] = choice
-                        if choice != "— Select —":
-                            j = opts.index(choice) - 1
+                        if choice not in ["— Select —", "Custom"]:
+                            # User selected a detected stint - update manual ranges
+                            j = opts.index(choice) - 2  # -2 for "— Select —" and "Custom"
                             s_lap, e_lap = stints[j]
                             st.session_state.car_ranges[car] = (int(s_lap), int(e_lap))
-                            # Sync manual inputs with stint selection
                             st.session_state[f"manual_start_{car}"] = int(s_lap)
                             st.session_state[f"manual_end_{car}"] = int(e_lap)
-                        else:
+                        elif choice == "— Select —":
                             st.session_state.car_ranges.pop(car, None)
+                        # "Custom" selection doesn't change car_ranges - keeps manual values
         else:
             st.info("Select at least one car to prepare stints.")
 
@@ -809,6 +824,17 @@ with tab1:
                             st.session_state[f"manual_end_{car}"] = s_val
 
                         st.session_state.car_ranges[car] = (int(s_val), int(e_val))
+
+                        # Check if manual range matches a detected stint
+                        stints = det_map.get(car, [])
+                        matches_stint = any(
+                            (int(ss), int(se)) == (int(s_val), int(e_val))
+                            for (ss, se) in stints
+                        )
+                        # If doesn't match, set dropdown to "Custom"
+                        if not matches_stint and stints:
+                            st.session_state[f"gf_pick_{car}"] = "Custom"
+                            st.session_state[f"_prev_gf_pick_{car}"] = "Custom"
             else:
                 st.info("Select at least one car to choose laps.")
 
