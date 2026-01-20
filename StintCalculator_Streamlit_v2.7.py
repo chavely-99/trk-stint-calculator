@@ -685,7 +685,7 @@ with tab1:
         # --------- per-car stint picker (dropdowns) - default to FIRST stint ---------
         det_map = st.session_state.get("detected_stints", {})
         if visible_cars:
-            st.markdown("**Choose a green-flag stint per car (optional):**")
+            st.markdown("**Choose a green-flag stint per car** *(select 'Custom' to enter manual lap range)*")
             cols_per_row = 4
             cars_sorted = sorted(visible_cars, key=_numeric_then_alpha)
             rows = (len(cars_sorted) + cols_per_row - 1) // cols_per_row
@@ -701,51 +701,34 @@ with tab1:
                     labels = [f"L{s}-L{e}" for (s, e) in stints]
                     opts = ["— Select —", "Custom"] + labels
 
-                    # Check if current manual range matches a detected stint
-                    cur_range = st.session_state.car_ranges.get(car)
-                    matching_stint_idx = None
-                    if cur_range:
-                        for si, (ss, se) in enumerate(stints):
-                            if (int(ss), int(se)) == (int(cur_range[0]), int(cur_range[1])):
-                                matching_stint_idx = si
-                                break
+                    # Determine default index based on stored selection
+                    stint_key = f"stint_selection_{car}"
+                    if stint_key not in st.session_state:
+                        # Default to first stint if available
+                        st.session_state[stint_key] = labels[0] if labels else "— Select —"
 
-                    # Check if marked as custom from manual lap range input
-                    is_custom = st.session_state.get(f"_is_custom_{car}", False)
-
-                    # Determine default index
-                    prior_val_key = f"gf_pick_{car}"
-                    if is_custom:
-                        default_index = 1  # Custom
-                    elif matching_stint_idx is not None:
-                        default_index = matching_stint_idx + 2  # +2 for "— Select —" and "Custom"
+                    stored_selection = st.session_state[stint_key]
+                    if stored_selection in opts:
+                        default_index = opts.index(stored_selection)
                     elif stints:
                         default_index = 2  # First stint
                     else:
-                        default_index = 0  # — Select —
+                        default_index = 0
 
-                    # Use a version key to force dropdown to update when custom flag changes
-                    dropdown_ver = 1 if is_custom else 0
-                    choice = col.selectbox(f"Car {car}", opts, index=default_index, key=f"{prior_val_key}_v{dropdown_ver}")
+                    choice = col.selectbox(f"Car {car}", opts, index=default_index, key=f"gf_pick_{car}")
 
-                    # Handle selection changes
-                    prev_choice_key = f"_prev_gf_pick_{car}"
-                    prev_choice = st.session_state.get(prev_choice_key)
-                    if choice != prev_choice:
-                        st.session_state[prev_choice_key] = choice
-                        if choice not in ["— Select —", "Custom"]:
-                            # User selected a detected stint - update manual ranges and clear custom flag
-                            j = opts.index(choice) - 2  # -2 for "— Select —" and "Custom"
-                            s_lap, e_lap = stints[j]
-                            st.session_state.car_ranges[car] = (int(s_lap), int(e_lap))
-                            st.session_state[f"manual_start_{car}"] = int(s_lap)
-                            st.session_state[f"manual_end_{car}"] = int(e_lap)
-                            st.session_state[f"_is_custom_{car}"] = False
-                            st.rerun()
-                        elif choice == "— Select —":
-                            st.session_state.car_ranges.pop(car, None)
-                            st.session_state[f"_is_custom_{car}"] = False
-                        # "Custom" selection doesn't change car_ranges - keeps manual values
+                    # Update stored selection and car_ranges
+                    if choice != stored_selection:
+                        st.session_state[stint_key] = choice
+
+                    if choice not in ["— Select —", "Custom"]:
+                        # User selected a detected stint - set car_ranges
+                        j = opts.index(choice) - 2  # -2 for "— Select —" and "Custom"
+                        s_lap, e_lap = stints[j]
+                        st.session_state.car_ranges[car] = (int(s_lap), int(e_lap))
+                    elif choice == "— Select —":
+                        st.session_state.car_ranges.pop(car, None)
+                    # "Custom" - car_ranges will be set by manual lap range inputs
         else:
             st.info("Select at least one car to prepare stints.")
 
@@ -790,7 +773,7 @@ with tab1:
         # --------- Manual lap ranges ---------
         with st.expander("Manual lap ranges", expanded=False):
             if not df_r.empty and visible_cars:
-                st.caption("Enter **Start Lap** and **End Lap** per car. This overrides any stint selection for that car.")
+                st.caption("Select **'Custom'** in the stint dropdown above to enable manual lap range entry.")
                 max_laps = int(df_r.shape[0])
                 cars_sorted = sorted(visible_cars, key=_numeric_then_alpha)
 
@@ -804,6 +787,10 @@ with tab1:
                             col.empty(); continue
                         car = cars_sorted[idx]; idx += 1
 
+                        # Check if Custom is selected for this car
+                        stint_key = f"stint_selection_{car}"
+                        is_custom = st.session_state.get(stint_key) == "Custom"
+
                         # Initialize session state keys if not present
                         if f"manual_start_{car}" not in st.session_state:
                             cur_s, cur_e = st.session_state.car_ranges.get(car, (1, max_laps))
@@ -812,34 +799,42 @@ with tab1:
                             st.session_state[f"manual_start_{car}"] = cur_s
                             st.session_state[f"manual_end_{car}"] = cur_e
 
-                        s_val = col.number_input(
-                            f"Car {car} — Start Lap",
-                            min_value=1,
-                            max_value=max_laps,
-                            step=1,
-                            key=f"manual_start_{car}",
-                        )
-                        e_val = col.number_input(
-                            f"Car {car} — End Lap",
-                            min_value=1,
-                            max_value=max_laps,
-                            step=1,
-                            key=f"manual_end_{car}",
-                        )
-                        if e_val < s_val:
-                            e_val = s_val
-                            st.session_state[f"manual_end_{car}"] = s_val
+                        # Show current range or allow editing if Custom
+                        if is_custom:
+                            s_val = col.number_input(
+                                f"Car {car} — Start Lap",
+                                min_value=1,
+                                max_value=max_laps,
+                                step=1,
+                                key=f"manual_start_{car}",
+                            )
+                            e_val = col.number_input(
+                                f"Car {car} — End Lap",
+                                min_value=1,
+                                max_value=max_laps,
+                                step=1,
+                                key=f"manual_end_{car}",
+                            )
+                            if e_val < s_val:
+                                e_val = s_val
+                                st.session_state[f"manual_end_{car}"] = s_val
 
-                        st.session_state.car_ranges[car] = (int(s_val), int(e_val))
-
-                        # Check if manual range matches a detected stint - mark as custom if not
-                        stints = det_map.get(car, [])
-                        matches_stint = any(
-                            (int(ss), int(se)) == (int(s_val), int(e_val))
-                            for (ss, se) in stints
-                        )
-                        # Track if this car has a custom range (doesn't match any stint)
-                        st.session_state[f"_is_custom_{car}"] = not matches_stint and bool(stints)
+                            st.session_state.car_ranges[car] = (int(s_val), int(e_val))
+                        else:
+                            # Disabled - show current values from stint selection
+                            cur_s, cur_e = st.session_state.car_ranges.get(car, (1, max_laps))
+                            col.number_input(
+                                f"Car {car} — Start Lap",
+                                value=int(cur_s),
+                                disabled=True,
+                                key=f"manual_start_disabled_{car}",
+                            )
+                            col.number_input(
+                                f"Car {car} — End Lap",
+                                value=int(cur_e),
+                                disabled=True,
+                                key=f"manual_end_disabled_{car}",
+                            )
             else:
                 st.info("Select at least one car to choose laps.")
 
