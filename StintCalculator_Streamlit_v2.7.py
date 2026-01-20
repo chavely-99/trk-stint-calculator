@@ -1874,38 +1874,48 @@ with tab3:
                     if "visible" not in stg:
                         stg["visible"] = True
 
-                # Build dataframe with color indicator
+                # Build editable dataframe
                 df_rows = []
                 for i, stg in enumerate(strategies):
                     delta = (stg["total_time"] - best_time) if (best_time is not None and np.isfinite(stg["total_time"])) else None
                     df_rows.append({
-                        "●": "●",  # placeholder for color
+                        "Show": stg.get("visible", True),
                         "Strategy": stg["name"],
                         "Pre | Post": f"{stg.get('pre_model','?')} | {stg.get('post_model','?')}",
                         "Pit Stops": str(stg["pit_stops"]),
                         "Total (s)": round(stg["total_time"], 1) if np.isfinite(stg["total_time"]) else None,
                         "Δ (s)": round(delta, 1) if delta is not None else None,
+                        "Delete": False,
                     })
 
                 if df_rows:
                     df = pd.DataFrame(df_rows)
-                    st.dataframe(df, hide_index=True, use_container_width=True)
+                    edited_df = st.data_editor(
+                        df,
+                        hide_index=True,
+                        use_container_width=True,
+                        column_config={
+                            "Show": st.column_config.CheckboxColumn("👁", help="Show on plot", default=True, width="small"),
+                            "Delete": st.column_config.CheckboxColumn("🗑", help="Delete", default=False, width="small"),
+                            "Strategy": st.column_config.TextColumn("Strategy", disabled=True),
+                            "Pre | Post": st.column_config.TextColumn("Pre | Post", disabled=True),
+                            "Pit Stops": st.column_config.TextColumn("Pit Stops", disabled=True),
+                            "Total (s)": st.column_config.NumberColumn("Total (s)", disabled=True, format="%.1f"),
+                            "Δ (s)": st.column_config.NumberColumn("Δ (s)", disabled=True, format="%.1f"),
+                        },
+                        key=f"strat_editor_{tab_idx}",
+                    )
 
-                # Multiselect for plot visibility + delete
-                col_vis, col_del = st.columns([3, 1])
-                with col_vis:
-                    strat_options = [f"{stg['name']} ({stg.get('pre_model','?')})" for stg in strategies]
-                    visible_default = [strat_options[i] for i, stg in enumerate(strategies) if stg.get("visible", True)]
-                    selected = st.multiselect("Show on plot", strat_options, default=visible_default, key=f"vis_select_{tab_idx}")
+                    # Update visibility
                     for i, stg in enumerate(strategies):
-                        stg["visible"] = strat_options[i] in selected
+                        if i < len(edited_df):
+                            stg["visible"] = bool(edited_df.iloc[i]["Show"])
 
-                with col_del:
-                    del_options = [""] + [f"Delete: {stg['name']}" for stg in strategies]
-                    to_del = st.selectbox("Remove", del_options, key=f"del_select_{tab_idx}", label_visibility="collapsed")
-                    if to_del and to_del != "":
-                        idx = del_options.index(to_del) - 1
-                        del st.session_state.strategies_tabs[tab_idx]["strategies"][idx]
+                    # Delete checked rows
+                    delete_indices = [i for i in range(len(edited_df)) if edited_df.iloc[i]["Delete"]]
+                    if delete_indices:
+                        for idx in sorted(delete_indices, reverse=True):
+                            del st.session_state.strategies_tabs[tab_idx]["strategies"][idx]
                         st.rerun()
 
                 # ---------- Δ vs best plot (colors per row; no cross-connecting) ----------
