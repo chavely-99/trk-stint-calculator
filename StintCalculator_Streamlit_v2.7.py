@@ -1294,8 +1294,8 @@ with tab2:
 
                             if use_linear != st.session_state.model_linear_mode.get(name, False):
                                 st.session_state.model_linear_mode[name] = use_linear
-                                # If switching to linear mode and no params exist, detect them
-                                if use_linear and name not in st.session_state.model_linear_params:
+                                # When switching to piecewise mode, always fit fresh
+                                if use_linear:
                                     series_data = pd.to_numeric(st.session_state.model_table[name], errors="coerce").dropna()
                                     x_data = np.arange(1, len(series_data) + 1, dtype=float)
                                     y_data = series_data.values.astype(float)
