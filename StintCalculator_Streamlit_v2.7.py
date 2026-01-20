@@ -1091,12 +1091,11 @@ with tab1:
 
 # ---------------- TAB 2 ----------------
 with tab2:
-    _header_col, _refresh_col = st.columns([10, 1])
-    with _header_col:
+    _hdr_c1, _hdr_c2 = st.columns([20, 1])
+    with _hdr_c1:
         st.subheader("Data & Fitting")
-    with _refresh_col:
-        if st.button("🔄", key="refresh_tab2", help="Refresh data"):
-            st.rerun()
+    with _hdr_c2:
+        st.button("↻", key="refresh_tab2", help="Refresh after loading workspace")
 
     if "model_table" not in st.session_state:
         st.session_state.model_table = pd.DataFrame()
@@ -1425,8 +1424,6 @@ with tab2:
                     st.session_state.model_params_original.pop(name, None)
                 st.success(f"Deleted {len(delete_ops)} model(s).")
                 st.rerun()
-
-    st.markdown("---")
 
     # =============================== Lap Time Models (table) ===============================
     with st.expander("Lap Time Models (Data Table)", expanded=False):
