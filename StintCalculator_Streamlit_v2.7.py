@@ -1870,13 +1870,14 @@ with tab3:
             # ---------- table ----------
             with left:
                 # Header row
-                h_cols = st.columns([0.06, 0.30, 0.30, 0.20, 0.12, 0.12, 0.06, 0.06], vertical_alignment="center")
+                h_cols = st.columns([0.04, 0.04, 0.28, 0.28, 0.18, 0.10, 0.10, 0.04], vertical_alignment="center")
                 h_cols[0].write("")
-                h_cols[1].markdown("**Strategy Name**")
-                h_cols[2].markdown("**Pre | Post Model**")
-                h_cols[3].markdown("**Pit Stops**")
-                h_cols[4].markdown("**Total (s)**")
-                h_cols[5].markdown("**Δ (s)**")
+                h_cols[1].write("")
+                h_cols[2].markdown("**Strategy Name**")
+                h_cols[3].markdown("**Pre | Post Model**")
+                h_cols[4].markdown("**Pit Stops**")
+                h_cols[5].markdown("**Total (s)**")
+                h_cols[6].markdown("**Δ (s)**")
                 h_cols[7].write("")
                 delete_indices = []
                 for i, stg in enumerate(strategies):
@@ -1885,31 +1886,32 @@ with tab3:
                         stg["visible"] = True
                     is_visible = stg.get("visible", True)
                     delta = (stg["total_time"] - best_time) if (best_time is not None and np.isfinite(stg["total_time"])) else None
-                    cols = st.columns([0.06, 0.30, 0.30, 0.20, 0.12, 0.12, 0.06, 0.06])
+                    cols = st.columns([0.04, 0.04, 0.28, 0.28, 0.18, 0.10, 0.10, 0.04])
+                    # Visibility toggle (checkbox) - first column
+                    new_vis = cols[0].checkbox("", value=is_visible, key=f"vis_{tab_idx}_{i}", label_visibility="collapsed")
+                    if new_vis != is_visible:
+                        stg["visible"] = new_vis
+                        st.rerun()
                     # Color swatch - dim if hidden
                     opacity = "1.0" if is_visible else "0.3"
-                    cols[0].markdown(
+                    cols[1].markdown(
                         f"<div style='width:14px;height:14px;border-radius:4px;background:{colors[i]};opacity:{opacity};'></div>",
                         unsafe_allow_html=True,
                     )
                     text_style = "" if is_visible else "opacity: 0.5;"
-                    cols[1].markdown(f"<span style='{text_style}'>{stg['name']}</span>", unsafe_allow_html=True)
-                    cols[2].markdown(f"<span style='{text_style}'>{stg.get('pre_model','?')} | {stg.get('post_model','?')}</span>", unsafe_allow_html=True)
-                    cols[3].markdown(f"<span style='{text_style}'>{stg['pit_stops']}</span>", unsafe_allow_html=True)
+                    cols[2].markdown(f"<span style='{text_style}'>{stg['name']}</span>", unsafe_allow_html=True)
+                    cols[3].markdown(f"<span style='{text_style}'>{stg.get('pre_model','?')} | {stg.get('post_model','?')}</span>", unsafe_allow_html=True)
+                    cols[4].markdown(f"<span style='{text_style}'>{stg['pit_stops']}</span>", unsafe_allow_html=True)
                     if np.isfinite(stg["total_time"]):
-                        cols[4].markdown(f"<span style='{text_style}'>{stg['total_time']:.1f}</span>", unsafe_allow_html=True)
+                        cols[5].markdown(f"<span style='{text_style}'>{stg['total_time']:.1f}</span>", unsafe_allow_html=True)
                         if delta is not None:
-                            cols[5].markdown(f"<span style='{text_style}'>{delta:.1f}</span>", unsafe_allow_html=True)
+                            cols[6].markdown(f"<span style='{text_style}'>{delta:.1f}</span>", unsafe_allow_html=True)
                         else:
-                            cols[5].markdown(f"<span style='{text_style}'>—</span>", unsafe_allow_html=True)
+                            cols[6].markdown(f"<span style='{text_style}'>—</span>", unsafe_allow_html=True)
                     else:
-                        cols[4].markdown(f"<span style='{text_style}'>—</span>", unsafe_allow_html=True)
                         cols[5].markdown(f"<span style='{text_style}'>—</span>", unsafe_allow_html=True)
-                    # Visibility toggle (checkbox)
-                    new_vis = cols[6].checkbox("", value=is_visible, key=f"vis_{tab_idx}_{i}", label_visibility="collapsed")
-                    if new_vis != is_visible:
-                        stg["visible"] = new_vis
-                        st.rerun()
+                        cols[6].markdown(f"<span style='{text_style}'>—</span>", unsafe_allow_html=True)
+                    # Delete button
                     if cols[7].button("×", key=f"del_{tab_idx}_{i}"):
                         delete_indices.append(i)
                 if delete_indices:
