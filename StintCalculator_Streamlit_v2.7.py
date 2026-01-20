@@ -1969,10 +1969,23 @@ with tab3:
                             [pitlap], s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, base_default, use_model_base
                         )
                         final_delta = tot - base_total
+                        # Calculate initial gain (laps between pit and desired)
+                        init_gain = 0.0
+                        if offset < 0:  # early pit
+                            for L in range(pitlap + 1, int(desired) + 1):
+                                lt_base = compute_effective_lap_time(L - s + 1, a1, b1, c1_, base_default, use_model_base)
+                                lt_early = compute_effective_lap_time(L - pitlap, a2, b2, c2_, base_default, use_model_base)
+                                init_gain += (lt_base - lt_early)
+                        elif offset > 0:  # late pit
+                            for L in range(int(desired) + 1, pitlap + 1):
+                                lt_base = compute_effective_lap_time(L - s + 1, a1, b1, c1_, base_default, use_model_base)
+                                lt_late = compute_effective_lap_time(L - int(desired), a2, b2, c2_, base_default, use_model_base)
+                                init_gain += (lt_late - lt_base)
                         label = f"{offset:+d}" if offset != 0 else "0"
                         if offset == 0:
                             even_idx = len(rows)
                         rows.append({"Early/Late": label, "Pit Lap": pitlap,
+                                     "Initial Δ (s)": round(float(-init_gain), 2),
                                      "Final Δ (s)": round(float(final_delta), 2)})
                     if rows:
                         wdf = pd.DataFrame(rows)
@@ -1980,7 +1993,7 @@ with tab3:
                             if row.name == even_idx:
                                 return ['font-weight: bold'] * len(row)
                             return [''] * len(row)
-                        styled = wdf.style.apply(highlight_even, axis=1).format({"Final Δ (s)": "{:.2f}"})
+                        styled = wdf.style.apply(highlight_even, axis=1).format({"Initial Δ (s)": "{:.2f}", "Final Δ (s)": "{:.2f}"})
                         st.dataframe(styled, hide_index=True, use_container_width=True)
                     else:
                         st.info("Adjust desired lap for valid range.")
