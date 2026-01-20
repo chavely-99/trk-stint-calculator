@@ -1905,12 +1905,12 @@ with tab3:
                     else:
                         cols[4].markdown(f"<span style='{text_style}'>—</span>", unsafe_allow_html=True)
                         cols[5].markdown(f"<span style='{text_style}'>—</span>", unsafe_allow_html=True)
-                    # Visibility toggle
-                    eye_icon = "👁" if is_visible else "◯"
-                    if cols[6].button(eye_icon, key=f"vis_{tab_idx}_{i}"):
-                        stg["visible"] = not is_visible
+                    # Visibility toggle (checkbox)
+                    new_vis = cols[6].checkbox("", value=is_visible, key=f"vis_{tab_idx}_{i}", label_visibility="collapsed")
+                    if new_vis != is_visible:
+                        stg["visible"] = new_vis
                         st.rerun()
-                    if cols[7].button("🗑️", key=f"del_{tab_idx}_{i}"):
+                    if cols[7].button("×", key=f"del_{tab_idx}_{i}"):
                         delete_indices.append(i)
                 if delete_indices:
                     for idx in sorted(delete_indices, reverse=True):
