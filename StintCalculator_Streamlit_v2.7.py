@@ -1959,8 +1959,8 @@ with tab3:
                         [int(desired)], s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, base_default, use_model_base
                     )
                     rows = []
-                    # Offsets: -10, -5, -4, -3, -2, -1, 0 (even), +1, +2, +3, +4, +5, +10
-                    offsets = [-10, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 10]
+                    # Offsets: -10, -5, -3, -1, 0, +1, +3, +5, +10
+                    offsets = [-10, -5, -3, -1, 0, 1, 3, 5, 10]
                     for offset in offsets:
                         pitlap = int(desired) + offset
                         if pitlap <= s or pitlap >= e: continue
@@ -1968,13 +1968,7 @@ with tab3:
                             [pitlap], s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, base_default, use_model_base
                         )
                         final_delta = tot - base_total
-                        # Label for offset
-                        if offset < 0:
-                            label = f"{-offset} early"
-                        elif offset > 0:
-                            label = f"{offset} late"
-                        else:
-                            label = "even"
+                        label = f"{offset:+d}" if offset != 0 else "0"
                         rows.append({"Offset": label, "Pit Lap": pitlap,
                                      "Final Δ (s)": round(float(final_delta), 2)})
                     if rows:
