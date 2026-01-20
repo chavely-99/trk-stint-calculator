@@ -72,6 +72,14 @@ def piecewise_linear_equation(x: np.ndarray, transitions: List[float], slopes: L
     result = np.zeros_like(x, dtype=float)
     transitions_sorted = sorted(transitions)
 
+    # Safety check: ensure we have enough slopes/intercepts
+    n_segments = len(transitions_sorted) + 1
+    if len(slopes) < n_segments or len(intercepts) < n_segments:
+        # Fall back to using available segments, clamp to last valid segment
+        max_segment = min(len(slopes), len(intercepts)) - 1
+    else:
+        max_segment = n_segments - 1
+
     for i, x_val in enumerate(x):
         # Find which segment this x belongs to
         segment = 0
@@ -81,6 +89,8 @@ def piecewise_linear_equation(x: np.ndarray, transitions: List[float], slopes: L
             else:
                 break
 
+        # Clamp segment to valid range
+        segment = min(segment, max_segment)
         result[i] = slopes[segment] * x_val + intercepts[segment]
 
     return result
@@ -1167,6 +1177,18 @@ with tab2:
                 transitions = linear_params.get("transitions", [])
                 slopes = linear_params.get("slopes", [])
                 intercepts = linear_params.get("intercepts", [])
+
+                # Check if slopes/intercepts match transitions (fix old workspace data)
+                expected_segments = len(transitions) + 1
+                if len(slopes) != expected_segments or len(intercepts) != expected_segments:
+                    # Refit to fix mismatched data
+                    slopes, intercepts = refit_linear_segments(x, series, transitions)
+                    st.session_state.model_linear_params[model_name] = {
+                        "transitions": transitions,
+                        "slopes": slopes,
+                        "intercepts": intercepts
+                    }
+
                 # Extend fit line to max of data length or last transition (T4)
                 max_x = max(len(series), max(transitions) if transitions else len(series))
                 fx = np.linspace(1, max_x, 300)
