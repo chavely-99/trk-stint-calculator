@@ -1647,197 +1647,181 @@ with tab3:
             st.info("Fit at least one model in the Data & Fitting tab.")
             return
 
-        # defaults for NEW rows
-        c0, c1 = st.columns(2)
-        with c0:
-            pre_model_default = st.selectbox("Model (Pre-Stop) – default for new strategies",
-                                             ["-- Select --"] + models, key=f"pre_model_{tab_idx}")
-        with c1:
-            post_model_default = st.selectbox("Model (Post-Stop) – default for new strategies",
-                                              ["-- Select --"] + models, key=f"post_model_{tab_idx}")
-
-        tab_store = st.session_state.strategies_tabs[tab_idx]
-
-        c2, c3, c4 = st.columns([1, 1, 1], gap="small")
-        with c2:
-            st.session_state.str_start_lap = st.number_input(
-                "Start Lap", min_value=1, value=int(st.session_state.get("str_start_lap", 1)),
-                step=1, key=f"start_{tab_idx}"
-            )
-        with c3:
-            st.session_state.str_end_lap = st.number_input(
-                "End Lap", min_value=1, value=int(st.session_state.get("str_end_lap", 100)),
-                step=1, key=f"end_{tab_idx}"
-            )
-        with c4:
-            pit_time = st.number_input(
-                "Pit Time (s)", min_value=0.0,
-                value=st.session_state.global_pit_time if st.session_state.global_pit_time is not None else 0.0,
-                step=0.5, key=f"pit_time_{tab_idx}",
-                placeholder="Required"
-            )
-            # Only update if user has entered a value > 0
-            if pit_time > 0:
-                st.session_state.global_pit_time = pit_time
-            else:
-                st.session_state.global_pit_time = None
-
-        # Always use model's fitted base time
-        use_model_base = True
-
-        s = int(st.session_state.str_start_lap)
-        e = int(st.session_state.str_end_lap)
-
-        # Check if pit time is defined
-        pit_time_defined = st.session_state.global_pit_time is not None and st.session_state.global_pit_time > 0
-
-        if not pit_time_defined:
-            st.warning("⚠️ Please enter a Pit Time before adding strategies.")
-            pit_time_default = 0.0
-        else:
-            pit_time_default = float(st.session_state.global_pit_time)
-
-        base_default = 0.0  # Not used when use_model_base=True
-
         tab_store = st.session_state.strategies_tabs[tab_idx]
         if "strategies" not in tab_store:
             tab_store["strategies"] = []
         strategies = tab_store["strategies"]
 
+        # Always use model's fitted base time
+        use_model_base = True
+        base_default = 0.0  # Not used when use_model_base=True
+
         def _both_models_selected(pm, qm) -> bool:
             return (pm in st.session_state.model_params) and (qm in st.session_state.model_params)
 
-        # ---- add row buttons (inline custom laps)
-        b = st.columns([1, 1, 1, 1, 1, 1, 2.2])
-        with b[0]:
-            if st.button("Add No-Stop", key=f"add_ns_{tab_idx}", disabled=not pit_time_defined):
-                if _both_models_selected(pre_model_default, post_model_default):
-                    strategies.append({
-                        "name": "No-Stop", "pit_stops": [],
-                        "pre_model": pre_model_default, "post_model": post_model_default,
-                        "total_time": 0.0, "cum_times": [],
-                        "start_lap": s, "end_lap": e,
-                        "pit_time": pit_time_default,
-                    })
-                else:
-                    st.warning("Select valid Pre/Post models before adding.")
-        with b[1]:
-            if st.button("Add Even Split", key=f"add_even1_{tab_idx}", disabled=not pit_time_defined):
-                if e > s and _both_models_selected(pre_model_default, post_model_default):
-                    pit = s + (e - s) // 2
-                    strategies.append({
-                        "name": "Even Split", "pit_stops": [pit],
-                        "pre_model": pre_model_default, "post_model": post_model_default,
-                        "total_time": 0.0, "cum_times": [],
-                        "start_lap": s, "end_lap": e,
-                        "pit_time": pit_time_default,
-                    })
-                else:
-                    st.warning("Select valid Pre/Post models before adding.")
-        with b[2]:
-            if st.button("Add Even 2-Stop", key=f"add_even2_{tab_idx}", disabled=not pit_time_defined):
-                if e > s + 1 and _both_models_selected(pre_model_default, post_model_default):
-                    L = e - s + 1
-                    p1 = s + L // 3; p2 = s + (2 * L // 3)
-                    if s < p1 < p2 < e:
-                        strategies.append({
-                            "name": "Even 2-Stop", "pit_stops": [p1, p2],
-                            "pre_model": pre_model_default, "post_model": post_model_default,
-                            "total_time": 0.0, "cum_times": [],
-                            "start_lap": s, "end_lap": e,
-                            "pit_time": pit_time_default,
-                        })
-                    else:
-                        st.warning("Window too short for 2 even stops strictly inside.")
-                else:
-                    st.warning("Select valid Pre/Post models before adding.")
-        with b[3]:
-            if st.button("Add Even 3-Stop", key=f"add_even3_{tab_idx}", disabled=not pit_time_defined):
-                if e > s + 2 and _both_models_selected(pre_model_default, post_model_default):
-                    L = e - s + 1
-                    p1 = s + L // 4; p2 = s + L // 2; p3 = s + (3 * L // 4)
-                    P = [p for p in [p1, p2, p3] if s < p < e]
-                    if len(P) == 3 and P[0] < P[1] < P[2]:
-                        strategies.append({
-                            "name": "Even 3-Stop", "pit_stops": P,
-                            "pre_model": pre_model_default, "post_model": post_model_default,
-                            "total_time": 0.0, "cum_times": [],
-                            "start_lap": s, "end_lap": e,
-                            "pit_time": pit_time_default,
-                        })
-                    else:
-                        st.warning("Window too short for 3 even stops strictly inside.")
-                else:
-                    st.warning("Select valid Pre/Post models before adding.")
-        with b[4]:
-            if st.button("Optimal 1-Stop", key=f"opt1_{tab_idx}", disabled=not pit_time_defined):
-                if _both_models_selected(pre_model_default, post_model_default):
-                    a1, b1, c1_ = st.session_state.model_params[pre_model_default]
-                    a2, b2, c2_ = st.session_state.model_params[post_model_default]
-                    best_time, best_pit = find_optimal_single_stop(s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, 0.0, use_model_base)
-                    if best_pit is not None:
-                        strategies.append({
-                            "name": "Optimal 1-Stop", "pit_stops": [best_pit],
-                            "pre_model": pre_model_default, "post_model": post_model_default,
-                            "total_time": 0.0, "cum_times": [],
-                            "start_lap": s, "end_lap": e,
-                            "pit_time": pit_time_default,
-                        })
-                    else:
-                        st.warning("No valid single-stop pit lap for the current range.")
-                else:
-                    st.warning("Select valid Pre/Post models.")
-        with b[5]:
-            if st.button("Optimal 2-Stop", key=f"opt2_{tab_idx}", disabled=not pit_time_defined):
-                if _both_models_selected(pre_model_default, post_model_default):
-                    a1, b1, c1_ = st.session_state.model_params[pre_model_default]
-                    a2, b2, c2_ = st.session_state.model_params[post_model_default]
-                    best_time, best_pits = find_optimal_two_stop(s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, 0.0, use_model_base)
-                    if best_pits is not None:
-                        strategies.append({
-                            "name": "Optimal 2-Stop", "pit_stops": list(best_pits),
-                            "pre_model": pre_model_default, "post_model": post_model_default,
-                            "total_time": 0.0, "cum_times": [],
-                            "start_lap": s, "end_lap": e,
-                            "pit_time": pit_time_default,
-                        })
-                    else:
-                        st.warning("No valid two-stop solution for the current range.")
-                else:
-                    st.warning("Select valid Pre/Post models.")
-        # inline custom laps: input + button in same cell
-        with b[6]:
-            # looks like a normal button; opens a tiny panel
-            with st.popover("Custom Stop Lap(s)"):
-                st.caption("Enter laps comma-separated within the current window")
-                laps_str = st.text_input(
-                    "Laps",
-                    value="",
-                    key=f"custom_laps_{tab_idx}",
-                    placeholder="34, 67",
+        # Two-column layout: inputs on left, buttons on right
+        left_col, right_col = st.columns([1, 1], gap="large")
+
+        with left_col:
+            # Model selectors
+            m1, m2 = st.columns(2)
+            with m1:
+                pre_model_default = st.selectbox("Pre-Stop Model", ["-- Select --"] + models, key=f"pre_model_{tab_idx}")
+            with m2:
+                post_model_default = st.selectbox("Post-Stop Model", ["-- Select --"] + models, key=f"post_model_{tab_idx}")
+
+            # Lap range and pit time
+            r1, r2, r3 = st.columns(3)
+            with r1:
+                st.session_state.str_start_lap = st.number_input(
+                    "Start Lap", min_value=1, value=int(st.session_state.get("str_start_lap", 1)),
+                    step=1, key=f"start_{tab_idx}"
                 )
-                if st.button("Add", key=f"add_custom_{tab_idx}"):
-                    if not _both_models_selected(pre_model_default, post_model_default):
-                        st.warning("Select valid Pre/Post models before adding.")
-                    else:
-                        try:
-                            raw = [t.strip() for t in laps_str.split(",") if t.strip()]
-                            laps = sorted({int(x) for x in raw})
-                            laps = [p for p in laps if s < p < e]
-                            if not laps:
-                                st.warning("No valid pit laps parsed inside (start,end).")
-                            else:
+            with r2:
+                st.session_state.str_end_lap = st.number_input(
+                    "End Lap", min_value=1, value=int(st.session_state.get("str_end_lap", 100)),
+                    step=1, key=f"end_{tab_idx}"
+                )
+            with r3:
+                pit_time = st.number_input(
+                    "Pit Time (s)", min_value=0.0,
+                    value=st.session_state.global_pit_time if st.session_state.global_pit_time is not None else 0.0,
+                    step=0.5, key=f"pit_time_{tab_idx}",
+                    placeholder="Required"
+                )
+                if pit_time > 0:
+                    st.session_state.global_pit_time = pit_time
+                else:
+                    st.session_state.global_pit_time = None
+
+        s = int(st.session_state.str_start_lap)
+        e = int(st.session_state.str_end_lap)
+        pit_time_defined = st.session_state.global_pit_time is not None and st.session_state.global_pit_time > 0
+        pit_time_default = float(st.session_state.global_pit_time) if pit_time_defined else 0.0
+
+        with right_col:
+            if not pit_time_defined:
+                st.warning("Enter a Pit Time to add strategies.")
+            else:
+                st.caption("Add Strategy")
+                # Row 1: Even splits
+                b1, b2, b3, b4 = st.columns(4)
+                with b1:
+                    if st.button("No-Stop", key=f"add_ns_{tab_idx}", use_container_width=True):
+                        if _both_models_selected(pre_model_default, post_model_default):
+                            strategies.append({
+                                "name": "No-Stop", "pit_stops": [],
+                                "pre_model": pre_model_default, "post_model": post_model_default,
+                                "total_time": 0.0, "cum_times": [],
+                                "start_lap": s, "end_lap": e, "pit_time": pit_time_default,
+                            })
+                        else:
+                            st.toast("Select valid Pre/Post models")
+                with b2:
+                    if st.button("Even 1-Stop", key=f"add_even1_{tab_idx}", use_container_width=True):
+                        if e > s and _both_models_selected(pre_model_default, post_model_default):
+                            pit = s + (e - s) // 2
+                            strategies.append({
+                                "name": "Even 1-Stop", "pit_stops": [pit],
+                                "pre_model": pre_model_default, "post_model": post_model_default,
+                                "total_time": 0.0, "cum_times": [],
+                                "start_lap": s, "end_lap": e, "pit_time": pit_time_default,
+                            })
+                        else:
+                            st.toast("Select valid Pre/Post models")
+                with b3:
+                    if st.button("Even 2-Stop", key=f"add_even2_{tab_idx}", use_container_width=True):
+                        if e > s + 1 and _both_models_selected(pre_model_default, post_model_default):
+                            L = e - s + 1
+                            p1 = s + L // 3; p2 = s + (2 * L // 3)
+                            if s < p1 < p2 < e:
                                 strategies.append({
-                                    "name": "Custom Stops",
-                                    "pit_stops": laps,
-                                    "pre_model": pre_model_default,
-                                    "post_model": post_model_default,
+                                    "name": "Even 2-Stop", "pit_stops": [p1, p2],
+                                    "pre_model": pre_model_default, "post_model": post_model_default,
                                     "total_time": 0.0, "cum_times": [],
-                                    "start_lap": s, "end_lap": e,
-                                    "pit_time": pit_time_default,
-                                                                    })
-                        except Exception:
-                            st.warning("Couldn’t parse laps. Use numbers separated by commas.")
+                                    "start_lap": s, "end_lap": e, "pit_time": pit_time_default,
+                                })
+                            else:
+                                st.toast("Window too short for 2 stops")
+                        else:
+                            st.toast("Select valid Pre/Post models")
+                with b4:
+                    if st.button("Even 3-Stop", key=f"add_even3_{tab_idx}", use_container_width=True):
+                        if e > s + 2 and _both_models_selected(pre_model_default, post_model_default):
+                            L = e - s + 1
+                            p1 = s + L // 4; p2 = s + L // 2; p3 = s + (3 * L // 4)
+                            P = [p for p in [p1, p2, p3] if s < p < e]
+                            if len(P) == 3 and P[0] < P[1] < P[2]:
+                                strategies.append({
+                                    "name": "Even 3-Stop", "pit_stops": P,
+                                    "pre_model": pre_model_default, "post_model": post_model_default,
+                                    "total_time": 0.0, "cum_times": [],
+                                    "start_lap": s, "end_lap": e, "pit_time": pit_time_default,
+                                })
+                            else:
+                                st.toast("Window too short for 3 stops")
+                        else:
+                            st.toast("Select valid Pre/Post models")
+
+                # Row 2: Optimal + Custom
+                b5, b6, b7 = st.columns(3)
+                with b5:
+                    if st.button("Optimal 1-Stop", key=f"opt1_{tab_idx}", use_container_width=True):
+                        if _both_models_selected(pre_model_default, post_model_default):
+                            a1, b1_, c1_ = st.session_state.model_params[pre_model_default]
+                            a2, b2_, c2_ = st.session_state.model_params[post_model_default]
+                            best_time, best_pit = find_optimal_single_stop(s, e, pit_time_default, a1, b1_, c1_, a2, b2_, c2_, 0.0, use_model_base)
+                            if best_pit is not None:
+                                strategies.append({
+                                    "name": "Optimal 1-Stop", "pit_stops": [best_pit],
+                                    "pre_model": pre_model_default, "post_model": post_model_default,
+                                    "total_time": 0.0, "cum_times": [],
+                                    "start_lap": s, "end_lap": e, "pit_time": pit_time_default,
+                                })
+                            else:
+                                st.toast("No valid 1-stop for this range")
+                        else:
+                            st.toast("Select valid Pre/Post models")
+                with b6:
+                    if st.button("Optimal 2-Stop", key=f"opt2_{tab_idx}", use_container_width=True):
+                        if _both_models_selected(pre_model_default, post_model_default):
+                            a1, b1_, c1_ = st.session_state.model_params[pre_model_default]
+                            a2, b2_, c2_ = st.session_state.model_params[post_model_default]
+                            best_time, best_pits = find_optimal_two_stop(s, e, pit_time_default, a1, b1_, c1_, a2, b2_, c2_, 0.0, use_model_base)
+                            if best_pits is not None:
+                                strategies.append({
+                                    "name": "Optimal 2-Stop", "pit_stops": list(best_pits),
+                                    "pre_model": pre_model_default, "post_model": post_model_default,
+                                    "total_time": 0.0, "cum_times": [],
+                                    "start_lap": s, "end_lap": e, "pit_time": pit_time_default,
+                                })
+                            else:
+                                st.toast("No valid 2-stop for this range")
+                        else:
+                            st.toast("Select valid Pre/Post models")
+                with b7:
+                    with st.popover("Custom Stops", use_container_width=True):
+                        st.caption("Enter pit laps (comma-separated)")
+                        laps_str = st.text_input("Laps", value="", key=f"custom_laps_{tab_idx}", placeholder="34, 67")
+                        if st.button("Add", key=f"add_custom_{tab_idx}"):
+                            if not _both_models_selected(pre_model_default, post_model_default):
+                                st.warning("Select valid Pre/Post models")
+                            else:
+                                try:
+                                    raw = [t.strip() for t in laps_str.split(",") if t.strip()]
+                                    laps = sorted({int(x) for x in raw})
+                                    laps = [p for p in laps if s < p < e]
+                                    if not laps:
+                                        st.warning("No valid laps in range")
+                                    else:
+                                        strategies.append({
+                                            "name": "Custom Stops", "pit_stops": laps,
+                                            "pre_model": pre_model_default, "post_model": post_model_default,
+                                            "total_time": 0.0, "cum_times": [],
+                                            "start_lap": s, "end_lap": e, "pit_time": pit_time_default,
+                                        })
+                                except Exception:
+                                    st.warning("Invalid format")
 
 
         st.markdown("---")
