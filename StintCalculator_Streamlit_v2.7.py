@@ -702,21 +702,28 @@ with tab1:
                     opts = ["— Select —"] + labels
 
                     prior_val_key = f"gf_pick_{car}"
+                    prev_choice_key = f"_prev_gf_pick_{car}"
+
                     if prior_val_key in st.session_state and st.session_state[prior_val_key] in opts:
                         default_index = opts.index(st.session_state[prior_val_key])
                     else:
                         default_index = 1 if stints else 0
 
                     choice = col.selectbox(f"Car {car}", opts, index=default_index, key=prior_val_key)
-                    if choice != "— Select —":
-                        j = opts.index(choice) - 1
-                        s_lap, e_lap = stints[j]
-                        st.session_state.car_ranges[car] = (int(s_lap), int(e_lap))
-                        # Reset manual input keys to sync with stint selection
-                        st.session_state[f"manual_start_{car}"] = int(s_lap)
-                        st.session_state[f"manual_end_{car}"] = int(e_lap)
-                    else:
-                        st.session_state.car_ranges.pop(car, None)
+
+                    # Only update car_ranges if user actually changed the dropdown
+                    prev_choice = st.session_state.get(prev_choice_key)
+                    if choice != prev_choice:
+                        st.session_state[prev_choice_key] = choice
+                        if choice != "— Select —":
+                            j = opts.index(choice) - 1
+                            s_lap, e_lap = stints[j]
+                            st.session_state.car_ranges[car] = (int(s_lap), int(e_lap))
+                            # Sync manual inputs with stint selection
+                            st.session_state[f"manual_start_{car}"] = int(s_lap)
+                            st.session_state[f"manual_end_{car}"] = int(e_lap)
+                        else:
+                            st.session_state.car_ranges.pop(car, None)
         else:
             st.info("Select at least one car to prepare stints.")
 
