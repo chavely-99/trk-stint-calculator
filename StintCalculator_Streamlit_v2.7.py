@@ -710,19 +710,23 @@ with tab1:
                                 matching_stint_idx = si
                                 break
 
+                    # Check if marked as custom from manual lap range input
+                    is_custom = st.session_state.get(f"_is_custom_{car}", False)
+
                     # Determine default index
                     prior_val_key = f"gf_pick_{car}"
-                    if matching_stint_idx is not None:
-                        default_index = matching_stint_idx + 2  # +2 for "— Select —" and "Custom"
-                    elif cur_range and prior_val_key in st.session_state:
-                        # Has a range but doesn't match any stint - show Custom
+                    if is_custom:
                         default_index = 1  # Custom
+                    elif matching_stint_idx is not None:
+                        default_index = matching_stint_idx + 2  # +2 for "— Select —" and "Custom"
                     elif stints:
                         default_index = 2  # First stint
                     else:
                         default_index = 0  # — Select —
 
-                    choice = col.selectbox(f"Car {car}", opts, index=default_index, key=prior_val_key)
+                    # Use a version key to force dropdown to update when custom flag changes
+                    dropdown_ver = 1 if is_custom else 0
+                    choice = col.selectbox(f"Car {car}", opts, index=default_index, key=f"{prior_val_key}_v{dropdown_ver}")
 
                     # Handle selection changes
                     prev_choice_key = f"_prev_gf_pick_{car}"
@@ -730,14 +734,17 @@ with tab1:
                     if choice != prev_choice:
                         st.session_state[prev_choice_key] = choice
                         if choice not in ["— Select —", "Custom"]:
-                            # User selected a detected stint - update manual ranges
+                            # User selected a detected stint - update manual ranges and clear custom flag
                             j = opts.index(choice) - 2  # -2 for "— Select —" and "Custom"
                             s_lap, e_lap = stints[j]
                             st.session_state.car_ranges[car] = (int(s_lap), int(e_lap))
                             st.session_state[f"manual_start_{car}"] = int(s_lap)
                             st.session_state[f"manual_end_{car}"] = int(e_lap)
+                            st.session_state[f"_is_custom_{car}"] = False
+                            st.rerun()
                         elif choice == "— Select —":
                             st.session_state.car_ranges.pop(car, None)
+                            st.session_state[f"_is_custom_{car}"] = False
                         # "Custom" selection doesn't change car_ranges - keeps manual values
         else:
             st.info("Select at least one car to prepare stints.")
@@ -825,16 +832,14 @@ with tab1:
 
                         st.session_state.car_ranges[car] = (int(s_val), int(e_val))
 
-                        # Check if manual range matches a detected stint
+                        # Check if manual range matches a detected stint - mark as custom if not
                         stints = det_map.get(car, [])
                         matches_stint = any(
                             (int(ss), int(se)) == (int(s_val), int(e_val))
                             for (ss, se) in stints
                         )
-                        # If doesn't match, set dropdown to "Custom"
-                        if not matches_stint and stints:
-                            st.session_state[f"gf_pick_{car}"] = "Custom"
-                            st.session_state[f"_prev_gf_pick_{car}"] = "Custom"
+                        # Track if this car has a custom range (doesn't match any stint)
+                        st.session_state[f"_is_custom_{car}"] = not matches_stint and bool(stints)
             else:
                 st.info("Select at least one car to choose laps.")
 
