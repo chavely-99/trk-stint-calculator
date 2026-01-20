@@ -1254,10 +1254,10 @@ with tab2:
                             if st.button("🗑️", key=f"delete_{name}", help="Delete model"):
                                 delete_ops.append(name)
 
-                        # Linear mode adjustment (if fitted)
+                        # Piecewise mode adjustment (if fitted)
                         if is_fitted:
-                            # Linear mode toggle
-                            use_linear = st.checkbox("Adjust Curve (Linear Mode)",
+                            # Piecewise mode toggle
+                            use_linear = st.checkbox("Piecewise Mode",
                                                     value=st.session_state.model_linear_mode.get(name, False),
                                                     key=f"linear_mode_{name}",
                                                     help="Adjust degradation using piecewise linear segments")
