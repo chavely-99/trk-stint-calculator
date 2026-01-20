@@ -1880,6 +1880,7 @@ with tab3:
                     delta = (stg["total_time"] - best_time) if (best_time is not None and np.isfinite(stg["total_time"])) else None
                     df_rows.append({
                         "Show": stg.get("visible", True),
+                        "Color": colors[i],
                         "Strategy": stg["name"],
                         "Pre | Post": f"{stg.get('pre_model','?')} | {stg.get('post_model','?')}",
                         "Pit Stops": str(stg["pit_stops"]),
@@ -1895,14 +1896,16 @@ with tab3:
                         hide_index=True,
                         use_container_width=True,
                         column_config={
-                            "Show": st.column_config.CheckboxColumn("👁", help="Show on plot", default=True, width="small"),
-                            "Delete": st.column_config.CheckboxColumn("🗑", help="Mark for deletion", default=False, width="small"),
-                            "Strategy": st.column_config.TextColumn("Strategy", disabled=True),
-                            "Pre | Post": st.column_config.TextColumn("Pre | Post", disabled=True),
-                            "Pit Stops": st.column_config.TextColumn("Pit Stops", disabled=True),
-                            "Total (s)": st.column_config.NumberColumn("Total (s)", disabled=True, format="%.1f"),
-                            "Δ (s)": st.column_config.NumberColumn("Δ (s)", disabled=True, format="%.1f"),
+                            "Show": st.column_config.CheckboxColumn("**👁**", help="Show on plot", default=True, width="small"),
+                            "Color": st.column_config.TextColumn("", disabled=True, width="small"),
+                            "Strategy": st.column_config.TextColumn("**Strategy**", disabled=True),
+                            "Pre | Post": st.column_config.TextColumn("**Pre | Post**", disabled=True),
+                            "Pit Stops": st.column_config.TextColumn("**Pit Stops**", disabled=True),
+                            "Total (s)": st.column_config.NumberColumn("**Total (s)**", disabled=True, format="%.1f"),
+                            "Δ (s)": st.column_config.NumberColumn("**Δ (s)**", disabled=True, format="%.1f"),
+                            "Delete": st.column_config.CheckboxColumn("**🗑**", help="Mark for deletion", default=False, width="small"),
                         },
+                        column_order=["Show", "Color", "Strategy", "Pre | Post", "Pit Stops", "Total (s)", "Δ (s)", "Delete"],
                         key=f"strat_editor_{tab_idx}",
                     )
 
@@ -2015,11 +2018,13 @@ with tab3:
                                      "Final Δ (s)": round(float(final_delta), 2)})
                     if rows:
                         wdf = pd.DataFrame(rows)
+                        # Rename columns to bold headers
+                        wdf.columns = ["**Early/Late**", "**Pit Lap**", "**Initial Δ (s)**", "**Final Δ (s)**"]
                         def highlight_even(row):
                             if row.name == even_idx:
                                 return ['font-weight: bold'] * len(row)
                             return [''] * len(row)
-                        styled = wdf.style.apply(highlight_even, axis=1).format({"Initial Δ (s)": "{:.2f}", "Final Δ (s)": "{:.2f}"})
+                        styled = wdf.style.apply(highlight_even, axis=1).format({"**Initial Δ (s)**": "{:.2f}", "**Final Δ (s)**": "{:.2f}"})
                         st.dataframe(styled, hide_index=True, use_container_width=True)
                     else:
                         st.info("Adjust desired lap for valid range.")
