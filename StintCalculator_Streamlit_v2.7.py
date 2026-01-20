@@ -1876,7 +1876,7 @@ with tab3:
 
                 # Build editable dataframe
                 # Color squares matching _palette order: green, orange, blue, red, purple, brown, pink, gray, olive, cyan
-                color_squares = ["🟩", "🟧", "🟦", "🟥", "🟪", "🟫", "🩷", "⬜", "🟨", "🩵"]
+                color_squares = ["🟩", "🟧", "🟦", "🟥", "🟪", "🟫", "⬛", "⬜", "🟨", "🔷"]
                 df_rows = []
                 for i, stg in enumerate(strategies):
                     delta = (stg["total_time"] - best_time) if (best_time is not None and np.isfinite(stg["total_time"])) else None
