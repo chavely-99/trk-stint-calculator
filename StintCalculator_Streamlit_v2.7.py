@@ -68,22 +68,29 @@ def falloff_equation(x: np.ndarray, a: float, b: float, c: float) -> np.ndarray:
     return a + b * (x ** -0.5) + c * ((x ** -0.5) * np.log(x))
 
 def piecewise_linear_equation(x: np.ndarray, transitions: List[float], slopes: List[float], intercepts: List[float]) -> np.ndarray:
-    """Evaluate piecewise linear function at x values."""
+    """Evaluate piecewise linear function at x values.
+
+    With N transitions, we have N segments:
+    - Segment 0: x <= T1
+    - Segment 1: T1 < x <= T2
+    - ...
+    - Segment N-1: T(N-1) < x (extends to T_N and beyond)
+
+    The last transition (T4) marks the end of the fitted region but
+    the last segment continues with the same slope for extrapolation.
+    """
     result = np.zeros_like(x, dtype=float)
     transitions_sorted = sorted(transitions)
 
-    # Safety check: ensure we have enough slopes/intercepts
-    n_segments = len(transitions_sorted) + 1
-    if len(slopes) < n_segments or len(intercepts) < n_segments:
-        # Fall back to using available segments, clamp to last valid segment
-        max_segment = min(len(slopes), len(intercepts)) - 1
-    else:
-        max_segment = n_segments - 1
+    # N transitions = N segments (last segment extends beyond last transition)
+    n_segments = len(transitions_sorted)
+    max_segment = min(n_segments, len(slopes), len(intercepts)) - 1
 
     for i, x_val in enumerate(x):
         # Find which segment this x belongs to
+        # Use all transitions except the last one as boundaries
         segment = 0
-        for t in transitions_sorted:
+        for t in transitions_sorted[:-1]:  # Don't use last transition as boundary
             if x_val > t:
                 segment += 1
             else:
@@ -124,18 +131,16 @@ def detect_transition_points(x: np.ndarray, y: np.ndarray) -> Tuple[List[float],
 def refit_linear_segments(x: np.ndarray, y: np.ndarray, transitions: List[float]) -> Tuple[List[float], List[float]]:
     """Refit linear segments by drawing straight lines between transition points.
 
-    Uses the actual Y values from the data at each transition point to calculate
-    slopes that connect those points with straight lines.
+    With N transitions, we have N+1 segments. Each segment connects consecutive key points.
+    Key points are: start (lap 1), T1, T2, ..., TN.
 
-    For transitions beyond the data (T4 extrapolation), uses the last segment's slope
-    to extrapolate continuity.
+    For transitions beyond the data (extrapolation), uses the last known slope.
     """
     transitions_sorted = sorted(transitions)
     last_data_x = float(x[-1])
 
-    # Build list of key points: start, each transition
-    # Don't add x[-1] at the end - transitions now include the final point
-    key_x = [x[0]] + transitions_sorted
+    # Key points: start + all transitions
+    key_x = [float(x[0])] + transitions_sorted
 
     # Get Y values at each key point (use closest data point, or extrapolate)
     key_y = []
@@ -147,9 +152,9 @@ def refit_linear_segments(x: np.ndarray, y: np.ndarray, transitions: List[float]
         if kx <= last_data_x:
             # Within data range - use actual data
             idx = np.abs(x - kx).argmin()
-            key_y.append(y[idx])
+            key_y.append(float(y[idx]))
             last_known_x = kx
-            last_known_y = y[idx]
+            last_known_y = float(y[idx])
         else:
             # Beyond data - extrapolate using the previous segment's slope
             if last_known_slope is not None and last_known_y is not None:
@@ -157,7 +162,7 @@ def refit_linear_segments(x: np.ndarray, y: np.ndarray, transitions: List[float]
                 key_y.append(extrapolated_y)
             else:
                 # Fallback: use last data point
-                key_y.append(y[-1])
+                key_y.append(float(y[-1]))
 
         # Calculate slope for next iteration's extrapolation
         if i > 0 and key_x[i] != key_x[i-1]:
@@ -167,6 +172,8 @@ def refit_linear_segments(x: np.ndarray, y: np.ndarray, transitions: List[float]
                 last_known_y = key_y[i]
 
     # Calculate slope and intercept for each segment
+    # N transitions = N+1 segments, but we have N+1 key points (start + N transitions)
+    # So we get N slopes from consecutive pairs, which is correct for N transitions
     slopes = []
     intercepts = []
 
@@ -1179,7 +1186,8 @@ with tab2:
                 intercepts = linear_params.get("intercepts", [])
 
                 # Check if slopes/intercepts match transitions (fix old workspace data)
-                expected_segments = len(transitions) + 1
+                # With N transitions, we have N segments (T4 is end point, not boundary)
+                expected_segments = len(transitions)
                 if len(slopes) != expected_segments or len(intercepts) != expected_segments:
                     # Refit to fix mismatched data
                     slopes, intercepts = refit_linear_segments(x, series, transitions)
