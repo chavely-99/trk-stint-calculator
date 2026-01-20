@@ -1961,6 +1961,7 @@ with tab3:
                     rows = []
                     # Offsets: -10, -5, -3, -1, 0, +1, +3, +5, +10
                     offsets = [-10, -5, -3, -1, 0, 1, 3, 5, 10]
+                    even_idx = None
                     for offset in offsets:
                         pitlap = int(desired) + offset
                         if pitlap <= s or pitlap >= e: continue
@@ -1969,16 +1970,18 @@ with tab3:
                         )
                         final_delta = tot - base_total
                         label = f"{offset:+d}" if offset != 0 else "0"
-                        rows.append({"Offset": label, "Pit Lap": pitlap,
+                        if offset == 0:
+                            even_idx = len(rows)
+                        rows.append({"Early/Late": label, "Pit Lap": pitlap,
                                      "Final Δ (s)": round(float(final_delta), 2)})
                     if rows:
                         wdf = pd.DataFrame(rows)
-                        st.dataframe(
-                            wdf, hide_index=True, width="stretch",
-                            column_config={
-                                "Final Δ (s)": st.column_config.NumberColumn(format="%.2f"),
-                            }
-                        )
+                        def highlight_even(row):
+                            if row.name == even_idx:
+                                return ['font-weight: bold'] * len(row)
+                            return [''] * len(row)
+                        styled = wdf.style.apply(highlight_even, axis=1).format({"Final Δ (s)": "{:.2f}"})
+                        st.dataframe(styled, hide_index=True, use_container_width=True)
                     else:
                         st.info("Adjust desired lap for valid range.")
         else:
