@@ -335,7 +335,6 @@ SS_DEFAULTS = {
 
     # Global strategy settings (shared across all tabs)
     "global_pit_time": None,  # Requires user input
-    "global_base_lap_time": 28.0,
     # Strategies tabs (per-row pre/post models now)
     "strategies_tabs": [
         {
@@ -344,8 +343,6 @@ SS_DEFAULTS = {
             "start_lap": 1,
             "end_lap": 50,
             "pit_time": 31.0,
-            "base_lap_time": 28.0,
-            "use_model_base": False,
         },
         {
             "tab_name": "Stage 2",
@@ -353,8 +350,6 @@ SS_DEFAULTS = {
             "start_lap": 1,
             "end_lap": 50,
             "pit_time": 31.0,
-            "base_lap_time": 28.0,
-            "use_model_base": False,
         },
         {
             "tab_name": "Stage 3",
@@ -362,8 +357,6 @@ SS_DEFAULTS = {
             "start_lap": 1,
             "end_lap": 50,
             "pit_time": 31.0,
-            "base_lap_time": 28.0,
-            "use_model_base": False,
         },
         {
             "tab_name": "Stage 4",
@@ -371,8 +364,6 @@ SS_DEFAULTS = {
             "start_lap": 1,
             "end_lap": 50,
             "pit_time": 31.0,
-            "base_lap_time": 28.0,
-            "use_model_base": False,
         },
         {
             "tab_name": "Crossover",
@@ -380,8 +371,6 @@ SS_DEFAULTS = {
             "start_lap": 1,
             "end_lap": 50,
             "pit_time": 31.0,
-            "base_lap_time": 28.0,
-            "use_model_base": False,
         },
     ],
     # per-car green-flag settings/state
@@ -1542,7 +1531,6 @@ with tab2:
                 "str_start_lap": int(st.session_state.get("str_start_lap", 1)),
                 "str_end_lap": int(st.session_state.get("str_end_lap", 50)),
                 "str_pit_time": float(st.session_state.get("str_pit_time", 31.0)),
-                "str_base_lap_time": float(st.session_state.get("str_base_lap_time", 28.0)),
             },
         }
         b = io.BytesIO(json.dumps(payload, indent=2).encode("utf-8"))
@@ -1586,7 +1574,6 @@ with tab2:
                 st.session_state.str_start_lap = int(t3.get("str_start_lap", 1))
                 st.session_state.str_end_lap = int(t3.get("str_end_lap", 50))
                 st.session_state.str_pit_time = float(t3.get("str_pit_time", 31.0))
-                st.session_state.str_base_lap_time = float(t3.get("str_base_lap_time", 28.0))
 
                 import os
                 base = os.path.splitext(getattr(up_ws, "name", "stint_workspace.json"))[0]
@@ -1669,12 +1656,9 @@ with tab3:
             post_model_default = st.selectbox("Model (Post-Stop) – default for new strategies",
                                               ["-- Select --"] + models, key=f"post_model_{tab_idx}")
 
-        # Base time adjustment toggle
         tab_store = st.session_state.strategies_tabs[tab_idx]
-        if "use_model_base" not in tab_store:
-            tab_store["use_model_base"] = False
 
-        c2, c3, c4, c5, c6 = st.columns([1, 1, 1, 1, 1.5], gap="small")
+        c2, c3, c4 = st.columns([1, 1, 1], gap="small")
         with c2:
             st.session_state.str_start_lap = st.number_input(
                 "Start Lap", min_value=1, value=int(st.session_state.get("str_start_lap", 1)),
@@ -1697,31 +1681,9 @@ with tab3:
                 st.session_state.global_pit_time = pit_time
             else:
                 st.session_state.global_pit_time = None
-        with c5:
-            # Initialize if not present
-            if "global_base_lap_time" not in st.session_state:
-                st.session_state.global_base_lap_time = 28.0
 
-            base = st.number_input(
-                "Base Lap Time (s)",
-                min_value=0.0,
-                value=st.session_state.global_base_lap_time,
-                step=0.1,
-                key=f"base_{tab_idx}",
-                disabled=not st.session_state.get(f"use_common_base_{tab_idx}", True)
-            )
-            st.session_state.global_base_lap_time = base
-        with c6:
-            st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
-            use_common_base = st.checkbox(
-                "Use Common Base Lap Time",
-                value=not tab_store.get("use_model_base", False),
-                key=f"use_common_base_{tab_idx}",
-                help="When checked, normalize all models to the same Base Lap Time for comparison. When unchecked, each model uses its own fitted base time."
-            )
-            tab_store["use_model_base"] = not use_common_base
-
-        use_model_base = tab_store["use_model_base"]
+        # Always use model's fitted base time
+        use_model_base = True
 
         s = int(st.session_state.str_start_lap)
         e = int(st.session_state.str_end_lap)
@@ -1735,7 +1697,7 @@ with tab3:
         else:
             pit_time_default = float(st.session_state.global_pit_time)
 
-        base_default = float(st.session_state.global_base_lap_time)
+        base_default = 0.0  # Not used when use_model_base=True
 
         tab_store = st.session_state.strategies_tabs[tab_idx]
         if "strategies" not in tab_store:
@@ -1755,7 +1717,7 @@ with tab3:
                         "pre_model": pre_model_default, "post_model": post_model_default,
                         "total_time": 0.0, "cum_times": [],
                         "start_lap": s, "end_lap": e,
-                        "pit_time": pit_time_default, "base_lap_time": base_default,
+                        "pit_time": pit_time_default,
                     })
                 else:
                     st.warning("Select valid Pre/Post models before adding.")
@@ -1768,7 +1730,7 @@ with tab3:
                         "pre_model": pre_model_default, "post_model": post_model_default,
                         "total_time": 0.0, "cum_times": [],
                         "start_lap": s, "end_lap": e,
-                        "pit_time": pit_time_default, "base_lap_time": base_default,
+                        "pit_time": pit_time_default,
                     })
                 else:
                     st.warning("Select valid Pre/Post models before adding.")
@@ -1783,7 +1745,7 @@ with tab3:
                             "pre_model": pre_model_default, "post_model": post_model_default,
                             "total_time": 0.0, "cum_times": [],
                             "start_lap": s, "end_lap": e,
-                            "pit_time": pit_time_default, "base_lap_time": base_default,
+                            "pit_time": pit_time_default,
                         })
                     else:
                         st.warning("Window too short for 2 even stops strictly inside.")
@@ -1801,7 +1763,7 @@ with tab3:
                             "pre_model": pre_model_default, "post_model": post_model_default,
                             "total_time": 0.0, "cum_times": [],
                             "start_lap": s, "end_lap": e,
-                            "pit_time": pit_time_default, "base_lap_time": base_default,
+                            "pit_time": pit_time_default,
                         })
                     else:
                         st.warning("Window too short for 3 even stops strictly inside.")
@@ -1812,14 +1774,14 @@ with tab3:
                 if _both_models_selected(pre_model_default, post_model_default):
                     a1, b1, c1_ = st.session_state.model_params[pre_model_default]
                     a2, b2, c2_ = st.session_state.model_params[post_model_default]
-                    best_time, best_pit = find_optimal_single_stop(s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, base_default, use_model_base)
+                    best_time, best_pit = find_optimal_single_stop(s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, 0.0, use_model_base)
                     if best_pit is not None:
                         strategies.append({
                             "name": "Optimal 1-Stop", "pit_stops": [best_pit],
                             "pre_model": pre_model_default, "post_model": post_model_default,
                             "total_time": 0.0, "cum_times": [],
                             "start_lap": s, "end_lap": e,
-                            "pit_time": pit_time_default, "base_lap_time": base_default,
+                            "pit_time": pit_time_default,
                         })
                     else:
                         st.warning("No valid single-stop pit lap for the current range.")
@@ -1830,14 +1792,14 @@ with tab3:
                 if _both_models_selected(pre_model_default, post_model_default):
                     a1, b1, c1_ = st.session_state.model_params[pre_model_default]
                     a2, b2, c2_ = st.session_state.model_params[post_model_default]
-                    best_time, best_pits = find_optimal_two_stop(s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, base_default, use_model_base)
+                    best_time, best_pits = find_optimal_two_stop(s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, 0.0, use_model_base)
                     if best_pits is not None:
                         strategies.append({
                             "name": "Optimal 2-Stop", "pit_stops": list(best_pits),
                             "pre_model": pre_model_default, "post_model": post_model_default,
                             "total_time": 0.0, "cum_times": [],
                             "start_lap": s, "end_lap": e,
-                            "pit_time": pit_time_default, "base_lap_time": base_default,
+                            "pit_time": pit_time_default,
                         })
                     else:
                         st.warning("No valid two-stop solution for the current range.")
@@ -1873,8 +1835,7 @@ with tab3:
                                     "total_time": 0.0, "cum_times": [],
                                     "start_lap": s, "end_lap": e,
                                     "pit_time": pit_time_default,
-                                    "base_lap_time": base_default,
-                                })
+                                                                    })
                         except Exception:
                             st.warning("Couldn’t parse laps. Use numbers separated by commas.")
 
@@ -1892,7 +1853,6 @@ with tab3:
                 a2, b2, c2_ = st.session_state.model_params[post]
                 s_row = int(stg.get("start_lap", s)); e_row = int(stg.get("end_lap", e))
                 pit_row = float(stg.get("pit_time", pit_time_default))
-                base_row = float(stg.get("base_lap_time", base_default))
 
                 # Check if models are using linear mode
                 use_linear1 = st.session_state.model_linear_mode.get(pre, False)
@@ -1901,7 +1861,7 @@ with tab3:
                 linear_params2 = st.session_state.model_linear_params.get(post, None) if use_linear2 else None
 
                 tot, cum = compute_total_time_and_laps_dual_model(
-                    stg["pit_stops"], s_row, e_row, pit_row, a1, b1, c1_, a2, b2, c2_, base_row, use_model_base,
+                    stg["pit_stops"], s_row, e_row, pit_row, a1, b1, c1_, a2, b2, c2_, 0.0, use_model_base,
                     pre, post, use_linear1, linear_params1, use_linear2, linear_params2
                 )
                 stg["total_time"] = float(tot)
@@ -2108,12 +2068,7 @@ with tab3:
         with c1:
             post_model = st.selectbox("Model (Post-Stop)", ["-- Select --"] + models, key="co_post_model")
 
-        # Base time adjustment toggle for Crossover tab
-        co_tab_store = st.session_state.strategies_tabs[4]  # Crossover is index 4
-        if "use_model_base" not in co_tab_store:
-            co_tab_store["use_model_base"] = False
-
-        c2, c3, c4, c5 = st.columns([1, 1, 1.5, 1], gap="small")
+        c2, c3 = st.columns([1, 1], gap="small")
         with c2:
             pit_time = st.number_input("Pit Time (s)", min_value=0.0,
                                        value=st.session_state.global_pit_time if st.session_state.global_pit_time is not None else 0.0,
@@ -2125,30 +2080,10 @@ with tab3:
             else:
                 st.session_state.global_pit_time = None
         with c3:
-            # Initialize if not present
-            if "global_base_lap_time" not in st.session_state:
-                st.session_state.global_base_lap_time = 28.0
-
-            base = st.number_input("Base Lap Time (s)",
-                                   min_value=0.0,
-                                   value=st.session_state.global_base_lap_time,
-                                   step=0.1,
-                                   key="base_crossover",
-                                   disabled=not st.session_state.get("use_common_base_crossover", True))
-            st.session_state.global_base_lap_time = base
-        with c4:
-            st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
-            use_common_base_co = st.checkbox(
-                "Use Common Base Lap Time",
-                value=not co_tab_store.get("use_model_base", False),
-                key="use_common_base_crossover",
-                help="When checked, normalize all models to the same Base Lap Time for comparison. When unchecked, each model uses its own fitted base time."
-            )
-            co_tab_store["use_model_base"] = not use_common_base_co
-        with c5:
             minL = st.number_input("Min stint length (laps)", min_value=6, value=40, step=1, key="co_minL")
 
-        use_model_base_co = co_tab_store["use_model_base"]
+        # Always use model's fitted base time
+        use_model_base_co = True
 
         if pre_model not in st.session_state.model_params or post_model not in st.session_state.model_params:
             st.info("Select valid Pre/Post models."); return
@@ -2157,12 +2092,12 @@ with tab3:
         a2, b2, c2_ = st.session_state.model_params[post_model]
 
         def _total_ns(L: int) -> float:
-            total, _ = compute_total_time_and_laps_dual_model([], 1, L, 0.0, a1, b1, c1_, a2, b2, c2_, float(base), use_model_base_co)
+            total, _ = compute_total_time_and_laps_dual_model([], 1, L, 0.0, a1, b1, c1_, a2, b2, c2_, 0.0, use_model_base_co)
             return float(total)
         def _total_even(L: int) -> float:
             if L < 2: return float("inf")
             pit = min(max(2, 1 + (L // 2)), L - 1)
-            total, _ = compute_total_time_and_laps_dual_model([pit], 1, L, float(pit_time), a1, b1, c1_, a2, b2, c2_, float(base), use_model_base_co)
+            total, _ = compute_total_time_and_laps_dual_model([pit], 1, L, float(pit_time), a1, b1, c1_, a2, b2, c2_, 0.0, use_model_base_co)
             return float(total)
 
         maxL = max(int(minL) + 10, int(minL) * 3)
