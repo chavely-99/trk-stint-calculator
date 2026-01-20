@@ -1896,7 +1896,7 @@ with tab3:
                         use_container_width=True,
                         column_config={
                             "Show": st.column_config.CheckboxColumn("👁", help="Show on plot", default=True, width="small"),
-                            "Delete": st.column_config.CheckboxColumn("🗑", help="Delete", default=False, width="small"),
+                            "Delete": st.column_config.CheckboxColumn("🗑", help="Mark for deletion", default=False, width="small"),
                             "Strategy": st.column_config.TextColumn("Strategy", disabled=True),
                             "Pre | Post": st.column_config.TextColumn("Pre | Post", disabled=True),
                             "Pit Stops": st.column_config.TextColumn("Pit Stops", disabled=True),
@@ -1911,12 +1911,14 @@ with tab3:
                         if i < len(edited_df):
                             stg["visible"] = bool(edited_df.iloc[i]["Show"])
 
-                    # Delete checked rows
+                    # Show delete button only if rows are marked
                     delete_indices = [i for i in range(len(edited_df)) if edited_df.iloc[i]["Delete"]]
                     if delete_indices:
-                        for idx in sorted(delete_indices, reverse=True):
-                            del st.session_state.strategies_tabs[tab_idx]["strategies"][idx]
-                        st.rerun()
+                        num = len(delete_indices)
+                        if st.button(f"Confirm Delete ({num})", key=f"confirm_del_{tab_idx}", type="primary"):
+                            for idx in sorted(delete_indices, reverse=True):
+                                del st.session_state.strategies_tabs[tab_idx]["strategies"][idx]
+                            st.rerun()
 
                 # ---------- Δ vs best plot (colors per row; no cross-connecting) ----------
                 drows = []
