@@ -1899,7 +1899,7 @@ with tab3:
                         cols[4].markdown(f"<span style='{text_style}'>—</span>", unsafe_allow_html=True)
                         cols[5].markdown(f"<span style='{text_style}'>—</span>", unsafe_allow_html=True)
                     # Visibility toggle
-                    eye_icon = "👁️" if is_visible else "👁️‍🗨️"
+                    eye_icon = "👁" if is_visible else "◯"
                     if cols[6].button(eye_icon, key=f"vis_{tab_idx}_{i}"):
                         stg["visible"] = not is_visible
                         st.rerun()
