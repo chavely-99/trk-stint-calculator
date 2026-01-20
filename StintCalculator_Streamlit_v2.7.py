@@ -1869,63 +1869,44 @@ with tab3:
 
             # ---------- table ----------
             with left:
-                # Header row
-                h_cols = st.columns([0.05, 0.24, 0.24, 0.17, 0.12, 0.12, 0.06])
-                h_cols[0].write("")
-                h_cols[1].markdown("**Strategy**")
-                h_cols[2].markdown("**Pre | Post**")
-                h_cols[3].markdown("**Pit Stops**")
-                h_cols[4].markdown("**Total (s)**")
-                h_cols[5].markdown("**Δ (s)**")
-                h_cols[6].write("")
-
-                delete_indices = []
-                for i, stg in enumerate(strategies):
+                # Initialize visibility
+                for stg in strategies:
                     if "visible" not in stg:
                         stg["visible"] = True
-                    is_visible = stg.get("visible", True)
+
+                # Build dataframe with color indicator
+                df_rows = []
+                for i, stg in enumerate(strategies):
                     delta = (stg["total_time"] - best_time) if (best_time is not None and np.isfinite(stg["total_time"])) else None
-                    cols = st.columns([0.05, 0.24, 0.24, 0.17, 0.12, 0.12, 0.06])
+                    df_rows.append({
+                        "●": "●",  # placeholder for color
+                        "Strategy": stg["name"],
+                        "Pre | Post": f"{stg.get('pre_model','?')} | {stg.get('post_model','?')}",
+                        "Pit Stops": str(stg["pit_stops"]),
+                        "Total (s)": round(stg["total_time"], 1) if np.isfinite(stg["total_time"]) else None,
+                        "Δ (s)": round(delta, 1) if delta is not None else None,
+                    })
 
-                    # Color swatch
-                    opacity = "1.0" if is_visible else "0.3"
-                    cols[0].markdown(
-                        f"<div style='width:12px;height:12px;border-radius:3px;background:{colors[i]};opacity:{opacity};'></div>",
-                        unsafe_allow_html=True,
-                    )
-                    text_style = "" if is_visible else "opacity:0.4;"
-                    cols[1].markdown(f"<span style='{text_style}'>{stg['name']}</span>", unsafe_allow_html=True)
-                    cols[2].markdown(f"<span style='{text_style}'>{stg.get('pre_model','?')} | {stg.get('post_model','?')}</span>", unsafe_allow_html=True)
-                    cols[3].markdown(f"<span style='{text_style}'>{stg['pit_stops']}</span>", unsafe_allow_html=True)
-                    total_str = f"{stg['total_time']:.1f}" if np.isfinite(stg["total_time"]) else "—"
-                    delta_str = f"{delta:.1f}" if delta is not None else "—"
-                    cols[4].markdown(f"<span style='{text_style}'>{total_str}</span>", unsafe_allow_html=True)
-                    cols[5].markdown(f"<span style='{text_style}'>{delta_str}</span>", unsafe_allow_html=True)
+                if df_rows:
+                    df = pd.DataFrame(df_rows)
+                    st.dataframe(df, hide_index=True, use_container_width=True)
 
-                    # Delete only (visibility via clicking color swatch would need JS)
-                    if cols[6].button("×", key=f"del_{tab_idx}_{i}"):
-                        delete_indices.append(i)
+                # Multiselect for plot visibility + delete
+                col_vis, col_del = st.columns([3, 1])
+                with col_vis:
+                    strat_options = [f"{stg['name']} ({stg.get('pre_model','?')})" for stg in strategies]
+                    visible_default = [strat_options[i] for i, stg in enumerate(strategies) if stg.get("visible", True)]
+                    selected = st.multiselect("Show on plot", strat_options, default=visible_default, key=f"vis_select_{tab_idx}")
+                    for i, stg in enumerate(strategies):
+                        stg["visible"] = strat_options[i] in selected
 
-                if delete_indices:
-                    for idx in sorted(delete_indices, reverse=True):
+                with col_del:
+                    del_options = [""] + [f"Delete: {stg['name']}" for stg in strategies]
+                    to_del = st.selectbox("Remove", del_options, key=f"del_select_{tab_idx}", label_visibility="collapsed")
+                    if to_del and to_del != "":
+                        idx = del_options.index(to_del) - 1
                         del st.session_state.strategies_tabs[tab_idx]["strategies"][idx]
-                    st.rerun()
-
-                # Visibility toggles below table
-                if strategies:
-                    st.caption("Toggle visibility:")
-                    viz_cols = st.columns(len(strategies))
-                    for i, (col, stg) in enumerate(zip(viz_cols, strategies)):
-                        is_visible = stg.get("visible", True)
-                        label = f"{stg['name'][:8]}..." if len(stg['name']) > 8 else stg['name']
-                        if col.checkbox(label, value=is_visible, key=f"vis_{tab_idx}_{i}"):
-                            if not is_visible:
-                                stg["visible"] = True
-                                st.rerun()
-                        else:
-                            if is_visible:
-                                stg["visible"] = False
-                                st.rerun()
+                        st.rerun()
 
                 # ---------- Δ vs best plot (colors per row; no cross-connecting) ----------
                 drows = []
