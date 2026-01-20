@@ -1292,19 +1292,19 @@ with tab2:
                                     x_data = np.arange(1, len(series_data) + 1, dtype=float)
                                     y_data = series_data.values.astype(float)
 
-                                    # Transition points with +/- buttons
+                                    # Transition points with +/- buttons in 2x2 grid
                                     # T4 can extend beyond data for extrapolation (up to 150 laps)
                                     st.markdown("**Transition Points (Lap)** - *adjusts curve automatically*")
                                     new_transitions = []
                                     trans_widget_key = "_".join([str(int(t)) for t in transitions])
-                                    cols_t = st.columns(len(transitions))
+                                    trans_rows = st.columns(2)
                                     for i, t in enumerate(transitions):
-                                        with cols_t[i]:
-                                            st.markdown(f"**T{i+1}**")
+                                        with trans_rows[i % 2]:
                                             # T4 (last transition) can go beyond data for extrapolation
                                             max_val = 150 if i == len(transitions) - 1 else int(n_laps) - 1
-                                            min_val = 2 if i == 0 else int(new_transitions[i-1]) + 1 if new_transitions else 2
+                                            min_val = 2 if i == 0 else int(transitions[i-1]) + 1
 
+                                            st.markdown(f"**T{i+1}**")
                                             col_t_minus, col_t_input, col_t_plus = st.columns([1, 2, 1])
                                             with col_t_minus:
                                                 if st.button("−", key=f"trans_minus_{name}_{i}_{trans_widget_key}", use_container_width=True):
