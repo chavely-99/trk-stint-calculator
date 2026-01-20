@@ -1482,7 +1482,11 @@ with tab2:
             "tab2": {
                 "model_table": st.session_state.get("model_table", pd.DataFrame()).to_dict(orient="list"),
                 "model_params": st.session_state.get("model_params", {}),
+                "model_params_original": st.session_state.get("model_params_original", {}),
                 "model_colors": st.session_state.get("model_colors", {}),
+                "model_linear_mode": st.session_state.get("model_linear_mode", {}),
+                "model_linear_params": st.session_state.get("model_linear_params", {}),
+                "model_visible": st.session_state.get("model_visible", {}),
             },
             "tab3": {
                 "strategies_tabs": st.session_state.get("strategies_tabs", []),
@@ -1522,7 +1526,11 @@ with tab2:
                 t2 = loaded.get("tab2", {})
                 st.session_state.model_table = pd.DataFrame.from_dict(t2.get("model_table", {}))
                 st.session_state.model_params = {str(k): tuple(v) for k, v in t2.get("model_params", {}).items()}
+                st.session_state.model_params_original = {str(k): tuple(v) for k, v in t2.get("model_params_original", {}).items()}
                 st.session_state.model_colors = {str(k): v for k, v in t2.get("model_colors", {}).items()}
+                st.session_state.model_linear_mode = {str(k): v for k, v in t2.get("model_linear_mode", {}).items()}
+                st.session_state.model_linear_params = {str(k): v for k, v in t2.get("model_linear_params", {}).items()}
+                st.session_state.model_visible = {str(k): v for k, v in t2.get("model_visible", {}).items()}
                 # tab3
                 t3 = loaded.get("tab3", {})
                 st.session_state.strategies_tabs = t3.get("strategies_tabs", st.session_state.strategies_tabs)
