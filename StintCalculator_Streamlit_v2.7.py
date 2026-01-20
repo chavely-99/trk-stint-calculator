@@ -544,8 +544,11 @@ def detect_green_flag_stints_per_car(
     return stints
 
 # ========================= Top Tabs =========================
-st.title(APP_TITLE)
-tab1, tab2, tab3 = st.tabs(["1) Laps & Averages", "2) Data & Fitting", "3) Strategies"])
+st.markdown(
+    '<p style="font-size:1.1rem;font-weight:600;color:#555;margin:0 0 0.5rem 0;">TRK – Stint Calculator</p>',
+    unsafe_allow_html=True
+)
+tab1, tab2, tab3 = st.tabs(["Laps & Averages", "Data & Fitting", "Strategies"])
 
 # ---------------- TAB 1 ----------------
 with tab1:
