@@ -1292,46 +1292,17 @@ with tab2:
                                     x_data = np.arange(1, len(series_data) + 1, dtype=float)
                                     y_data = series_data.values.astype(float)
 
-                                    # Transition points with +/- buttons in 2x2 grid
+                                    # Transition points in 2x2 grid with number inputs
                                     # T4 can extend beyond data for extrapolation (up to 150 laps)
                                     st.markdown("**Transition Points (Lap)** - *adjusts curve automatically*")
                                     new_transitions = []
-                                    trans_widget_key = "_".join([str(int(t)) for t in transitions])
                                     trans_rows = st.columns(2)
                                     for i, t in enumerate(transitions):
                                         with trans_rows[i % 2]:
                                             # T4 (last transition) can go beyond data for extrapolation
                                             max_val = 150 if i == len(transitions) - 1 else int(n_laps) - 1
                                             min_val = 2 if i == 0 else int(transitions[i-1]) + 1
-
-                                            st.markdown(f"**T{i+1}**")
-                                            col_t_minus, col_t_input, col_t_plus = st.columns([1, 2, 1])
-                                            with col_t_minus:
-                                                if st.button("−", key=f"trans_minus_{name}_{i}_{trans_widget_key}", use_container_width=True):
-                                                    new_val = max(min_val, int(t) - 1)
-                                                    updated_trans = list(transitions)
-                                                    updated_trans[i] = float(new_val)
-                                                    new_slopes, new_ints = refit_linear_segments(x_data, y_data, updated_trans)
-                                                    st.session_state.model_linear_params[name] = {
-                                                        "transitions": updated_trans,
-                                                        "slopes": new_slopes,
-                                                        "intercepts": new_ints
-                                                    }
-                                                    st.rerun()
-                                            with col_t_input:
-                                                new_t = st.number_input(f"T{i+1}", value=int(t), min_value=min_val, max_value=max_val, step=1, key=f"trans_{name}_{i}", label_visibility="collapsed")
-                                            with col_t_plus:
-                                                if st.button("＋", key=f"trans_plus_{name}_{i}_{trans_widget_key}", use_container_width=True):
-                                                    new_val = min(max_val, int(t) + 1)
-                                                    updated_trans = list(transitions)
-                                                    updated_trans[i] = float(new_val)
-                                                    new_slopes, new_ints = refit_linear_segments(x_data, y_data, updated_trans)
-                                                    st.session_state.model_linear_params[name] = {
-                                                        "transitions": updated_trans,
-                                                        "slopes": new_slopes,
-                                                        "intercepts": new_ints
-                                                    }
-                                                    st.rerun()
+                                            new_t = st.number_input(f"T{i+1}", value=int(t), min_value=min_val, max_value=max_val, step=1, key=f"trans_{name}_{i}")
                                             new_transitions.append(float(new_t))
 
                                     # Check if transitions changed - auto-refit if so
