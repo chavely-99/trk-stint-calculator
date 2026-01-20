@@ -1361,9 +1361,11 @@ with tab2:
                                             "slopes": new_slopes,
                                             "intercepts": new_intercepts
                                         }
-                                        # Clear any manual slope adjustments
-                                        if f"slope_adjust_{name}" in st.session_state:
-                                            del st.session_state[f"slope_adjust_{name}"]
+                                        # Clear cached slope widget values so they update
+                                        for i in range(len(new_slopes)):
+                                            slope_key = f"slope_{name}_{i}"
+                                            if slope_key in st.session_state:
+                                                del st.session_state[slope_key]
                                         st.rerun()
 
                                     # Slopes in 2x2 grid with number inputs (matching transition style)
