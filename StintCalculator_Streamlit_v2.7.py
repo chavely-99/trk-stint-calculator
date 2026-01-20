@@ -1862,15 +1862,15 @@ with tab3:
 
             # ---------- table ----------
             with left:
-                h_cols = st.columns([0.06, 0.36, 0.34, 0.24, 0.12, 0.12, 0.10])
-                h_cols[0].markdown("** **")
+                # Header row
+                h_cols = st.columns([0.06, 0.36, 0.34, 0.24, 0.12, 0.12, 0.10], vertical_alignment="center")
+                h_cols[0].write("")
                 h_cols[1].markdown("**Strategy Name**")
                 h_cols[2].markdown("**Pre | Post Model**")
                 h_cols[3].markdown("**Pit Stops**")
                 h_cols[4].markdown("**Total (s)**")
                 h_cols[5].markdown("**Δ (s)**")
-                h_cols[6].markdown("** **")
-
+                h_cols[6].write("")
                 delete_indices = []
                 for i, stg in enumerate(strategies):
                     delta = (stg["total_time"] - best_time) if (best_time is not None and np.isfinite(stg["total_time"])) else None
