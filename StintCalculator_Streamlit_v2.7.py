@@ -1929,54 +1929,128 @@ with tab3:
                                 del st.session_state.strategies_tabs[tab_idx]["strategies"][idx]
                             st.rerun()
 
-                # ---------- Δ vs best plot (colors per row; no cross-connecting) ----------
-                drows = []
+                # ---------- Plot view toggle ----------
+                view_mode = st.radio(
+                    "Plot View",
+                    ["Δ vs Best", "Gap on Track"],
+                    horizontal=True,
+                    key=f"plot_view_{tab_idx}"
+                )
+
                 # Filter to visible strategies only
                 visible_strategies = [(i, stg) for i, stg in enumerate(strategies) if stg.get("visible", True)]
-                if visible_strategies:
-                    # choose baseline = min total_time among visible
-                    visible_times = [stg["total_time"] for _, stg in visible_strategies]
-                    best_vis_idx = int(np.argmin(visible_times))
-                    _, sb = visible_strategies[best_vis_idx]
-                    sb_s = int(sb.get("start_lap", s)); sb_e = int(sb.get("end_lap", e))
-                    base_x = np.arange(sb_s, sb_e + 1, dtype=int)
-                    base_cum = np.array(sb["cum_times"], dtype=float)
 
-                    for i, stg in visible_strategies:
-                        s_row = int(stg.get("start_lap", s)); e_row = int(stg.get("end_lap", e))
-                        x_vals = np.arange(s_row, e_row + 1, dtype=int)
-                        cum = np.array(stg["cum_times"], dtype=float)
+                # Datum selector (only for Gap on Track)
+                datum_idx = 0
+                if view_mode == "Gap on Track" and visible_strategies:
+                    visible_names = [f"{stg['name']}" for _, stg in visible_strategies]
+                    datum_selection = st.selectbox(
+                        "Datum Strategy",
+                        range(len(visible_names)),
+                        format_func=lambda i: visible_names[i] + " (Datum)",
+                        key=f"datum_{tab_idx}"
+                    )
+                    datum_idx = datum_selection
 
-                        lo = max(s_row, sb_s); hi = min(e_row, sb_e)
-                        if lo > hi:  # no overlap -> skip
-                            continue
-                        ia = (x_vals >= lo) & (x_vals <= hi)
-                        ib = (base_x >= lo) & (base_x <= hi)
-                        diff = cum[ia] - base_cum[ib]
+                if view_mode == "Δ vs Best":
+                    # ---------- Δ vs best plot (colors per row; no cross-connecting) ----------
+                    drows = []
+                    if visible_strategies:
+                        # choose baseline = min total_time among visible
+                        visible_times = [stg["total_time"] for _, stg in visible_strategies]
+                        best_vis_idx = int(np.argmin(visible_times))
+                        _, sb = visible_strategies[best_vis_idx]
+                        sb_s = int(sb.get("start_lap", s)); sb_e = int(sb.get("end_lap", e))
+                        base_x = np.arange(sb_s, sb_e + 1, dtype=int)
+                        base_cum = np.array(sb["cum_times"], dtype=float)
 
-                        key = series_keys[i]
-                        for xv, dv in zip(np.arange(lo, hi + 1, dtype=int), diff):
-                            drows.append({"Lap": int(xv), "Δ vs Best (s)": float(dv), "SeriesKey": key})
+                        for i, stg in visible_strategies:
+                            s_row = int(stg.get("start_lap", s)); e_row = int(stg.get("end_lap", e))
+                            x_vals = np.arange(s_row, e_row + 1, dtype=int)
+                            cum = np.array(stg["cum_times"], dtype=float)
 
-                if drows:
-                    ddf = pd.DataFrame(drows)
-                    lo, hi = _tight_y(ddf["Δ vs Best (s)"].values)
-                    color_scale = alt.Scale(domain=series_keys, range=colors)
-                    ch = (
-                        alt.Chart(ddf)
-                        .mark_line(clip=True)
-                        .encode(
-                            x=alt.X("Lap:Q",
-                                    axis=alt.Axis(title="Lap", tickMinStep=1, format="d"),
-                                    scale=alt.Scale(zero=False, nice=True)),
-                            y=alt.Y("Δ vs Best (s):Q",
-                                    axis=alt.Axis(title="Δ (s)"),
-                                    scale=alt.Scale(domain=[lo, hi], zero=False, nice=True)),
-                            color=alt.Color("SeriesKey:N", scale=color_scale, legend=None),
-                            detail="SeriesKey:N"
-                        )
-                    ).properties(height=340)
-                    st.altair_chart(ch, width="stretch")
+                            lo = max(s_row, sb_s); hi = min(e_row, sb_e)
+                            if lo > hi:  # no overlap -> skip
+                                continue
+                            ia = (x_vals >= lo) & (x_vals <= hi)
+                            ib = (base_x >= lo) & (base_x <= hi)
+                            diff = cum[ia] - base_cum[ib]
+
+                            key = series_keys[i]
+                            for xv, dv in zip(np.arange(lo, hi + 1, dtype=int), diff):
+                                drows.append({"Lap": int(xv), "Δ vs Best (s)": float(dv), "SeriesKey": key})
+
+                    if drows:
+                        ddf = pd.DataFrame(drows)
+                        lo, hi = _tight_y(ddf["Δ vs Best (s)"].values)
+                        color_scale = alt.Scale(domain=series_keys, range=colors)
+                        ch = (
+                            alt.Chart(ddf)
+                            .mark_line(clip=True)
+                            .encode(
+                                x=alt.X("Lap:Q",
+                                        axis=alt.Axis(title="Lap", tickMinStep=1, format="d"),
+                                        scale=alt.Scale(zero=False, nice=True)),
+                                y=alt.Y("Δ vs Best (s):Q",
+                                        axis=alt.Axis(title="Δ (s)"),
+                                        scale=alt.Scale(domain=[lo, hi], zero=False, nice=True)),
+                                color=alt.Color("SeriesKey:N", scale=color_scale, legend=None),
+                                detail="SeriesKey:N"
+                            )
+                        ).properties(height=340)
+                        st.altair_chart(ch, width="stretch")
+
+                else:  # Gap on Track view
+                    # ---------- Gap on Track plot ----------
+                    gap_rows = []
+                    if visible_strategies:
+                        # Get datum strategy
+                        _, datum_stg = visible_strategies[datum_idx]
+                        datum_total = datum_stg["total_time"]
+                        datum_start = int(datum_stg.get("start_lap", s))
+                        datum_end = int(datum_stg.get("end_lap", e))
+                        datum_laps = datum_end - datum_start + 1
+                        datum_avg_lap = datum_total / datum_laps if datum_laps > 0 else 0
+
+                        # Get pit time for calculating pit stop drops
+                        pit_time_val = pit_time_default if pit_time_default else 0
+
+                        for i, stg in visible_strategies:
+                            s_row = int(stg.get("start_lap", s))
+                            e_row = int(stg.get("end_lap", e))
+                            per_lap = _per_lap_from_cum(stg["cum_times"])
+                            pit_stops_set = set(stg.get("pit_stops", []))
+
+                            gap = 0.0
+                            for lap_idx, lap_time in enumerate(per_lap):
+                                actual_lap = s_row + lap_idx
+                                # Gap changes by how much faster/slower than datum average
+                                gap += (datum_avg_lap - lap_time)
+                                # If this lap is a pit stop, subtract pit time (drop in graph)
+                                if actual_lap in pit_stops_set:
+                                    gap -= pit_time_val
+                                key = series_keys[i]
+                                gap_rows.append({"Lap": int(actual_lap), "Gap (s)": float(gap), "SeriesKey": key})
+
+                    if gap_rows:
+                        gdf = pd.DataFrame(gap_rows)
+                        lo, hi = _tight_y(gdf["Gap (s)"].values)
+                        color_scale = alt.Scale(domain=series_keys, range=colors)
+                        ch = (
+                            alt.Chart(gdf)
+                            .mark_line(clip=True)
+                            .encode(
+                                x=alt.X("Lap:Q",
+                                        axis=alt.Axis(title="Lap", tickMinStep=1, format="d"),
+                                        scale=alt.Scale(zero=False, nice=True)),
+                                y=alt.Y("Gap (s):Q",
+                                        axis=alt.Axis(title="Slower ← Gap (s) → Faster"),
+                                        scale=alt.Scale(domain=[lo, hi], reverse=True, nice=True)),
+                                color=alt.Color("SeriesKey:N", scale=color_scale, legend=None),
+                                detail="SeriesKey:N"
+                            )
+                        ).properties(height=340)
+                        st.altair_chart(ch, width="stretch")
 
             # ---------- right: early pit what-if (uses current dropdown models) ----------
             with right:
