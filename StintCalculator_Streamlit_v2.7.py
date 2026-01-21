@@ -1994,8 +1994,8 @@ with tab3:
                         [int(desired)], s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, base_default, use_model_base
                     )
                     rows = []
-                    # Offsets: -10, -5, -3, -1, 0, +1, +3, +5, +10
-                    offsets = [-10, -5, -3, -1, 0, 1, 3, 5, 10]
+                    # Offsets: -15, -10, -5, -3, -1, 0, +1, +3, +5, +10, +15
+                    offsets = [-15, -10, -5, -3, -1, 0, 1, 3, 5, 10, 15]
                     even_idx = None
                     for offset in offsets:
                         pitlap = int(desired) + offset
