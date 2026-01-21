@@ -1985,52 +1985,56 @@ with tab3:
                 else:
                     a1, b1, c1_ = st.session_state.model_params[pre_model_default]
                     a2, b2, c2_ = st.session_state.model_params[post_model_default]
-                    # Default to even split (midpoint of stint)
-                    even_split_default = s + (e - s) // 2
-                    even_split_default = max(s + 1, min(even_split_default, e - 1))  # clamp to valid range
+                    # Even split (midpoint of stint) - this is always the reference for deltas
+                    even_split = s + (e - s) // 2
+                    even_split = max(s + 1, min(even_split, e - 1))  # clamp to valid range
 
-                    baseline_lap = st.number_input("Baseline pit lap",
-                                                   min_value=s + 1, max_value=max(s + 1, e - 1),
-                                                   value=even_split_default,
-                                                   step=1, key=f"whatif_{tab_idx}")
+                    # User can change the center of the table, but deltas are always vs even split
+                    center_lap = st.number_input("Center pit lap",
+                                                 min_value=s + 1, max_value=max(s + 1, e - 1),
+                                                 value=even_split,
+                                                 step=1, key=f"whatif_{tab_idx}")
 
-                    # Compute baseline total time at selected baseline lap
-                    base_total, _ = compute_total_time_and_laps_dual_model(
-                        [int(baseline_lap)], s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, base_default, use_model_base
+                    # Compute baseline total time at EVEN SPLIT (always the reference)
+                    even_split_total, _ = compute_total_time_and_laps_dual_model(
+                        [even_split], s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, base_default, use_model_base
                     )
                     rows = []
                     # Offsets: -15, -10, -5, -3, -1, 0, +1, +3, +5, +10, +15
                     offsets = [-15, -10, -5, -3, -1, 0, 1, 3, 5, 10, 15]
-                    even_idx = None
+                    even_row_idx = None
                     for offset in offsets:
-                        pitlap = int(baseline_lap) + offset
+                        pitlap = int(center_lap) + offset
                         if pitlap <= s or pitlap >= e: continue
                         tot, _ = compute_total_time_and_laps_dual_model(
                             [pitlap], s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, base_default, use_model_base
                         )
-                        final_delta = tot - base_total
-                        # Calculate initial gain (laps between pit and baseline)
+                        # Final delta is ALWAYS vs even split
+                        final_delta = tot - even_split_total
+                        # Calculate initial gain (laps between pit and even split)
                         init_gain = 0.0
-                        if offset < 0:  # early pit
-                            for L in range(pitlap + 1, int(baseline_lap) + 1):
+                        if pitlap < even_split:  # early pit relative to even split
+                            for L in range(pitlap + 1, even_split + 1):
                                 lt_base = compute_effective_lap_time(L - s + 1, a1, b1, c1_, base_default, use_model_base)
                                 lt_early = compute_effective_lap_time(L - pitlap, a2, b2, c2_, base_default, use_model_base)
                                 init_gain += (lt_base - lt_early)
-                        elif offset > 0:  # late pit
-                            for L in range(int(baseline_lap) + 1, pitlap + 1):
+                        elif pitlap > even_split:  # late pit relative to even split
+                            for L in range(even_split + 1, pitlap + 1):
                                 lt_base = compute_effective_lap_time(L - s + 1, a1, b1, c1_, base_default, use_model_base)
-                                lt_late = compute_effective_lap_time(L - int(baseline_lap), a2, b2, c2_, base_default, use_model_base)
+                                lt_late = compute_effective_lap_time(L - even_split, a2, b2, c2_, base_default, use_model_base)
                                 init_gain += (lt_late - lt_base)
+                        # Label shows offset from center_lap (what's displayed)
                         label = f"{offset:+d}" if offset != 0 else "0"
-                        if offset == 0:
-                            even_idx = len(rows)
+                        # Bold the row that corresponds to even split
+                        if pitlap == even_split:
+                            even_row_idx = len(rows)
                         rows.append({"Early/Late": label, "Pit Lap": pitlap,
                                      "Initial Δ (s)": round(float(-init_gain), 2),
                                      "Final Δ (s)": round(float(final_delta), 2)})
                     if rows:
                         wdf = pd.DataFrame(rows)
                         def highlight_even(row):
-                            if row.name == even_idx:
+                            if row.name == even_row_idx:
                                 return ['font-weight: bold'] * len(row)
                             return [''] * len(row)
                         styled = wdf.style.apply(highlight_even, axis=1).format({"Initial Δ (s)": "{:.2f}", "Final Δ (s)": "{:.2f}"})
