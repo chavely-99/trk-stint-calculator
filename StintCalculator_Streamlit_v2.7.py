@@ -1868,80 +1868,83 @@ with tab3:
             series_keys = [f"{stg['name']} | {stg.get('pre_model','?')} | {stg.get('post_model','?')} | #{i}"
                            for i, stg in enumerate(strategies)]
 
-            # ===== LEFT (table + plot) | RIGHT (controls + what-if) =====
+            # ===== LEFT (table + controls + plot) | RIGHT (what-if) =====
             left, right = st.columns([3, 1], gap="large")
 
-            # ---------- table ----------
+            # ---------- left column: table, controls, plot ----------
             with left:
                 # Initialize visibility
                 for stg in strategies:
                     if "visible" not in stg:
                         stg["visible"] = True
 
-                # Build editable dataframe
-                # Color squares matching _palette order: green, orange, blue, red, purple, brown, pink, gray, olive, cyan
-                color_squares = ["🟩", "🟧", "🟦", "🟥", "🟪", "🟫", "⬛", "⬜", "🟨", "🔷"]
-                df_rows = []
-                for i, stg in enumerate(strategies):
-                    delta = (stg["total_time"] - best_time) if (best_time is not None and np.isfinite(stg["total_time"])) else None
-                    df_rows.append({
-                        "Show": stg.get("visible", True),
-                        "Color": color_squares[i % len(color_squares)],
-                        "Strategy": stg["name"],
-                        "Pre | Post": f"{stg.get('pre_model','?')} | {stg.get('post_model','?')}",
-                        "Pit Stops": str(stg["pit_stops"]),
-                        "Total (s)": round(stg["total_time"], 1) if np.isfinite(stg["total_time"]) else None,
-                        "Δ (s)": round(delta, 1) if delta is not None else None,
-                        "Delete": False,
-                    })
+                # Sub-columns: table on left, plot controls on right
+                table_col, controls_col = st.columns([3, 1])
 
-                if df_rows:
-                    df = pd.DataFrame(df_rows)
-                    edited_df = st.data_editor(
-                        df,
-                        hide_index=True,
-                        use_container_width=True,
-                        column_config={
-                            "Show": st.column_config.CheckboxColumn("View", help="Show on plot", default=True, width="small"),
-                            "Color": st.column_config.TextColumn("", disabled=True),
-                            "Strategy": st.column_config.TextColumn("Strategy", disabled=True),
-                            "Pre | Post": st.column_config.TextColumn("Pre | Post", disabled=True),
-                            "Pit Stops": st.column_config.TextColumn("Pit Stops", disabled=True),
-                            "Total (s)": st.column_config.NumberColumn("Total (s)", disabled=True, format="%.1f"),
-                            "Δ (s)": st.column_config.NumberColumn("Δ (s)", disabled=True, format="%.1f"),
-                            "Delete": st.column_config.CheckboxColumn("Delete", help="Mark for deletion", default=False, width="small"),
-                        },
-                        column_order=["Show", "Color", "Strategy", "Pre | Post", "Pit Stops", "Total (s)", "Δ (s)", "Delete"],
-                        key=f"strat_editor_{tab_idx}",
-                    )
-
-                    # Update visibility
+                with table_col:
+                    # Build editable dataframe
+                    # Color squares matching _palette order: green, orange, blue, red, purple, brown, pink, gray, olive, cyan
+                    color_squares = ["🟩", "🟧", "🟦", "🟥", "🟪", "🟫", "⬛", "⬜", "🟨", "🔷"]
+                    df_rows = []
                     for i, stg in enumerate(strategies):
-                        if i < len(edited_df):
-                            stg["visible"] = bool(edited_df.iloc[i]["Show"])
+                        delta = (stg["total_time"] - best_time) if (best_time is not None and np.isfinite(stg["total_time"])) else None
+                        df_rows.append({
+                            "Show": stg.get("visible", True),
+                            "Color": color_squares[i % len(color_squares)],
+                            "Strategy": stg["name"],
+                            "Pre | Post": f"{stg.get('pre_model','?')} | {stg.get('post_model','?')}",
+                            "Pit Stops": str(stg["pit_stops"]),
+                            "Total (s)": round(stg["total_time"], 1) if np.isfinite(stg["total_time"]) else None,
+                            "Δ (s)": round(delta, 1) if delta is not None else None,
+                            "Delete": False,
+                        })
 
-                    # Show delete button only if rows are marked
-                    delete_indices = [i for i in range(len(edited_df)) if edited_df.iloc[i]["Delete"]]
-                    if delete_indices:
-                        num = len(delete_indices)
-                        if st.button(f"Confirm Delete ({num})", key=f"confirm_del_{tab_idx}", type="primary"):
-                            for idx in sorted(delete_indices, reverse=True):
-                                del st.session_state.strategies_tabs[tab_idx]["strategies"][idx]
-                            st.rerun()
+                    if df_rows:
+                        df = pd.DataFrame(df_rows)
+                        edited_df = st.data_editor(
+                            df,
+                            hide_index=True,
+                            use_container_width=True,
+                            column_config={
+                                "Show": st.column_config.CheckboxColumn("View", help="Show on plot", default=True, width="small"),
+                                "Color": st.column_config.TextColumn("", disabled=True),
+                                "Strategy": st.column_config.TextColumn("Strategy", disabled=True),
+                                "Pre | Post": st.column_config.TextColumn("Pre | Post", disabled=True),
+                                "Pit Stops": st.column_config.TextColumn("Pit Stops", disabled=True),
+                                "Total (s)": st.column_config.NumberColumn("Total (s)", disabled=True, format="%.1f"),
+                                "Δ (s)": st.column_config.NumberColumn("Δ (s)", disabled=True, format="%.1f"),
+                                "Delete": st.column_config.CheckboxColumn("Delete", help="Mark for deletion", default=False, width="small"),
+                            },
+                            column_order=["Show", "Color", "Strategy", "Pre | Post", "Pit Stops", "Total (s)", "Δ (s)", "Delete"],
+                            key=f"strat_editor_{tab_idx}",
+                        )
+
+                        # Update visibility
+                        for i, stg in enumerate(strategies):
+                            if i < len(edited_df):
+                                stg["visible"] = bool(edited_df.iloc[i]["Show"])
+
+                        # Show delete button only if rows are marked
+                        delete_indices = [i for i in range(len(edited_df)) if edited_df.iloc[i]["Delete"]]
+                        if delete_indices:
+                            num = len(delete_indices)
+                            if st.button(f"Confirm Delete ({num})", key=f"confirm_del_{tab_idx}", type="primary"):
+                                for idx in sorted(delete_indices, reverse=True):
+                                    del st.session_state.strategies_tabs[tab_idx]["strategies"][idx]
+                                st.rerun()
 
                 # Filter to visible strategies only
                 visible_strategies = [(i, stg) for i, stg in enumerate(strategies) if stg.get("visible", True)]
 
-                # Plot view toggle and datum selector (in left column with table/plot)
-                plot_col1, plot_col2 = st.columns([1, 2])
-                with plot_col1:
+                with controls_col:
+                    # Plot view toggle
                     view_mode = st.radio(
                         "Plot View",
                         ["Δ vs Best", "Gap on Track"],
-                        horizontal=True,
+                        horizontal=False,
                         key=f"plot_view_{tab_idx}"
                     )
-                with plot_col2:
+                    # Datum selector (only for Gap on Track)
                     datum_idx = 0
                     if view_mode == "Gap on Track" and visible_strategies:
                         visible_names = [f"{stg['name']}" for _, stg in visible_strategies]
