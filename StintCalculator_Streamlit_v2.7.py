@@ -2004,16 +2004,19 @@ with tab3:
                     # ---------- Gap on Track plot ----------
                     gap_rows = []
                     if visible_strategies:
+                        # Get pit time for calculations
+                        pit_time_val = pit_time_default if pit_time_default else 0
+
                         # Get datum strategy
                         _, datum_stg = visible_strategies[datum_idx]
                         datum_total = datum_stg["total_time"]
                         datum_start = int(datum_stg.get("start_lap", s))
                         datum_end = int(datum_stg.get("end_lap", e))
                         datum_laps = datum_end - datum_start + 1
-                        datum_avg_lap = datum_total / datum_laps if datum_laps > 0 else 0
-
-                        # Get pit time for calculating pit stop drops
-                        pit_time_val = pit_time_default if pit_time_default else 0
+                        datum_pit_stops = len(datum_stg.get("pit_stops", []))
+                        # Subtract pit time from total to get pure driving time
+                        datum_driving_time = datum_total - (datum_pit_stops * pit_time_val)
+                        datum_avg_lap = datum_driving_time / datum_laps if datum_laps > 0 else 0
 
                         for i, stg in visible_strategies:
                             s_row = int(stg.get("start_lap", s))
