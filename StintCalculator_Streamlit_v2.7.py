@@ -2029,7 +2029,9 @@ with tab3:
                                 return ['font-weight: bold'] * len(row)
                             return [''] * len(row)
                         styled = wdf.style.apply(highlight_even, axis=1).format({"Initial Δ (s)": "{:.2f}", "Final Δ (s)": "{:.2f}"})
-                        st.dataframe(styled, hide_index=True, use_container_width=True)
+                        # Calculate height to fit all rows without scrolling (header + rows * ~35px per row)
+                        table_height = (len(rows) + 1) * 35 + 3
+                        st.dataframe(styled, hide_index=True, use_container_width=True, height=table_height)
                     else:
                         st.info("Adjust desired lap for valid range.")
         else:
