@@ -2025,10 +2025,11 @@ with tab3:
                             for lap_idx, lap_time in enumerate(per_lap):
                                 actual_lap = s_row + lap_idx
                                 # Gap changes by how much faster/slower than datum average
-                                gap += (datum_avg_lap - lap_time)
-                                # If this lap is a pit stop, subtract pit time (drop in graph)
+                                # Negative = ahead (faster), Positive = behind (slower)
+                                gap += (lap_time - datum_avg_lap)
+                                # If this lap is a pit stop, add pit time (drop down in graph)
                                 if actual_lap in pit_stops_set:
-                                    gap -= pit_time_val
+                                    gap += pit_time_val
                                 key = series_keys[i]
                                 gap_rows.append({"Lap": int(actual_lap), "Gap (s)": float(gap), "SeriesKey": key})
 
