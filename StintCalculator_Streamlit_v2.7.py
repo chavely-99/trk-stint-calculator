@@ -1908,7 +1908,7 @@ with tab3:
                             use_container_width=True,
                             column_config={
                                 "Show": st.column_config.CheckboxColumn("View", help="Show on plot", default=True, width="small"),
-                                "Color": st.column_config.TextColumn("", disabled=True, width=40),
+                                "Color": st.column_config.TextColumn("", disabled=True, width=20),
                                 "Strategy": st.column_config.TextColumn("Strategy", disabled=True),
                                 "Pre | Post": st.column_config.TextColumn("Pre | Post", disabled=True),
                                 "Pit Stops": st.column_config.TextColumn("Pit Stops", disabled=True),
