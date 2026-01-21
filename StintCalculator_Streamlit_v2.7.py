@@ -1823,8 +1823,9 @@ with tab3:
                                 if not laps:
                                     st.warning("No valid laps in range")
                                 else:
+                                    lap_labels = ", ".join(f"L{lap}" for lap in laps)
                                     strategies.append({
-                                        "name": "Custom Stops", "pit_stops": laps,
+                                        "name": f"Custom - {lap_labels}", "pit_stops": laps,
                                         "pre_model": pre_model_default, "post_model": post_model_default,
                                         "total_time": 0.0, "cum_times": [],
                                         "start_lap": s, "end_lap": e, "pit_time": pit_time_default,
