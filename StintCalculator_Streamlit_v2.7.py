@@ -1985,36 +1985,37 @@ with tab3:
                 else:
                     a1, b1, c1_ = st.session_state.model_params[pre_model_default]
                     a2, b2, c2_ = st.session_state.model_params[post_model_default]
-                    desired_default = min(max(s + 2, s + (e - s) // 2), e - 1) if (e - s + 1) >= 3 else s + 1
-                    desired = st.number_input("Desired pit lap",
-                                              min_value=s + 1, max_value=max(s + 1, e - 1),
-                                              value=min(desired_default, e - 1),
-                                              step=1, key=f"whatif_{tab_idx}")
+                    # Even split is always the baseline (midpoint of stint)
+                    even_split = s + (e - s) // 2
+                    even_split = max(s + 1, min(even_split, e - 1))  # clamp to valid range
+                    st.caption(f"Even split: Lap {even_split}")
+
+                    # Compute baseline total time at even split
                     base_total, _ = compute_total_time_and_laps_dual_model(
-                        [int(desired)], s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, base_default, use_model_base
+                        [even_split], s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, base_default, use_model_base
                     )
                     rows = []
                     # Offsets: -15, -10, -5, -3, -1, 0, +1, +3, +5, +10, +15
                     offsets = [-15, -10, -5, -3, -1, 0, 1, 3, 5, 10, 15]
                     even_idx = None
                     for offset in offsets:
-                        pitlap = int(desired) + offset
+                        pitlap = even_split + offset
                         if pitlap <= s or pitlap >= e: continue
                         tot, _ = compute_total_time_and_laps_dual_model(
                             [pitlap], s, e, pit_time_default, a1, b1, c1_, a2, b2, c2_, base_default, use_model_base
                         )
                         final_delta = tot - base_total
-                        # Calculate initial gain (laps between pit and desired)
+                        # Calculate initial gain (laps between pit and even split)
                         init_gain = 0.0
                         if offset < 0:  # early pit
-                            for L in range(pitlap + 1, int(desired) + 1):
+                            for L in range(pitlap + 1, even_split + 1):
                                 lt_base = compute_effective_lap_time(L - s + 1, a1, b1, c1_, base_default, use_model_base)
                                 lt_early = compute_effective_lap_time(L - pitlap, a2, b2, c2_, base_default, use_model_base)
                                 init_gain += (lt_base - lt_early)
                         elif offset > 0:  # late pit
-                            for L in range(int(desired) + 1, pitlap + 1):
+                            for L in range(even_split + 1, pitlap + 1):
                                 lt_base = compute_effective_lap_time(L - s + 1, a1, b1, c1_, base_default, use_model_base)
-                                lt_late = compute_effective_lap_time(L - int(desired), a2, b2, c2_, base_default, use_model_base)
+                                lt_late = compute_effective_lap_time(L - even_split, a2, b2, c2_, base_default, use_model_base)
                                 init_gain += (lt_late - lt_base)
                         label = f"{offset:+d}" if offset != 0 else "0"
                         if offset == 0:
@@ -2033,7 +2034,7 @@ with tab3:
                         table_height = (len(rows) + 1) * 35 + 3
                         st.dataframe(styled, hide_index=True, use_container_width=True, height=table_height)
                     else:
-                        st.info("Adjust desired lap for valid range.")
+                        st.info("Stint range too small for what-if analysis.")
         else:
             st.info("Add strategies to see results.")
 
