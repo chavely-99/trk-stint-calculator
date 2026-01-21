@@ -1932,9 +1932,25 @@ with tab3:
                 # Filter to visible strategies only
                 visible_strategies = [(i, stg) for i, stg in enumerate(strategies) if stg.get("visible", True)]
 
-                # Get view_mode and datum_idx from session state (set in right column)
-                view_mode = st.session_state.get(f"plot_view_{tab_idx}", "Δ vs Best")
-                datum_idx = st.session_state.get(f"datum_{tab_idx}", 0)
+                # Plot view toggle and datum selector (in left column with table/plot)
+                plot_col1, plot_col2 = st.columns([1, 2])
+                with plot_col1:
+                    view_mode = st.radio(
+                        "Plot View",
+                        ["Δ vs Best", "Gap on Track"],
+                        horizontal=True,
+                        key=f"plot_view_{tab_idx}"
+                    )
+                with plot_col2:
+                    datum_idx = 0
+                    if view_mode == "Gap on Track" and visible_strategies:
+                        visible_names = [f"{stg['name']}" for _, stg in visible_strategies]
+                        datum_idx = st.selectbox(
+                            "Datum Strategy",
+                            range(len(visible_names)),
+                            format_func=lambda i: visible_names[i] + " (Datum)",
+                            key=f"datum_{tab_idx}"
+                        )
 
                 if view_mode == "Δ vs Best":
                     # ---------- Δ vs best plot (colors per row; no cross-connecting) ----------
@@ -2035,29 +2051,8 @@ with tab3:
                         ).properties(height=340)
                         st.altair_chart(ch + zero_line, width="stretch")
 
-            # ---------- right: plot controls + early pit what-if ----------
+            # ---------- right: early pit what-if ----------
             with right:
-                # Plot view toggle
-                st.radio(
-                    "Plot View",
-                    ["Δ vs Best", "Gap on Track"],
-                    horizontal=True,
-                    key=f"plot_view_{tab_idx}"
-                )
-
-                # Datum selector (only for Gap on Track)
-                if st.session_state.get(f"plot_view_{tab_idx}") == "Gap on Track" and visible_strategies:
-                    visible_names = [f"{stg['name']}" for _, stg in visible_strategies]
-                    st.selectbox(
-                        "Datum Strategy",
-                        range(len(visible_names)),
-                        format_func=lambda i: visible_names[i] + " (Datum)",
-                        key=f"datum_{tab_idx}"
-                    )
-
-                st.markdown("---")
-
-                # Early/late pit what-if table
                 if pre_model_default not in st.session_state.model_params or post_model_default not in st.session_state.model_params:
                     st.info("Select valid Pre/Post models to run the what-if.")
                 else:
