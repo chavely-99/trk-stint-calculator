@@ -1937,23 +1937,25 @@ with tab3:
                 visible_strategies = [(i, stg) for i, stg in enumerate(strategies) if stg.get("visible", True)]
 
                 with controls_col:
-                    # Plot view toggle
-                    view_mode = st.radio(
-                        "Plot View",
-                        ["Δ vs Best", "Gap on Track"],
-                        horizontal=False,
-                        key=f"plot_view_{tab_idx}"
-                    )
-                    # Datum selector (only for Gap on Track)
-                    datum_idx = 0
-                    if view_mode == "Gap on Track" and visible_strategies:
-                        visible_names = [f"{stg['name']}" for _, stg in visible_strategies]
-                        datum_idx = st.selectbox(
-                            "Datum Strategy",
-                            range(len(visible_names)),
-                            format_func=lambda i: visible_names[i] + " (Datum)",
-                            key=f"datum_{tab_idx}"
+                    # Plot view toggle and datum selector side by side
+                    ctrl_left, ctrl_right = st.columns(2)
+                    with ctrl_left:
+                        view_mode = st.radio(
+                            "Plot View",
+                            ["Δ vs Best", "Gap on Track"],
+                            horizontal=False,
+                            key=f"plot_view_{tab_idx}"
                         )
+                    with ctrl_right:
+                        datum_idx = 0
+                        if view_mode == "Gap on Track" and visible_strategies:
+                            visible_names = [f"{stg['name']}" for _, stg in visible_strategies]
+                            datum_idx = st.selectbox(
+                                "Datum",
+                                range(len(visible_names)),
+                                format_func=lambda i: visible_names[i],
+                                key=f"datum_{tab_idx}"
+                            )
 
                 if view_mode == "Δ vs Best":
                     # ---------- Δ vs best plot (colors per row; no cross-connecting) ----------
