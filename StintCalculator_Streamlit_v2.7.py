@@ -1997,10 +1997,10 @@ with tab3:
                             .mark_line(clip=True)
                             .encode(
                                 x=alt.X("Lap:Q",
-                                        axis=alt.Axis(title="Lap", tickMinStep=1, format="d"),
+                                        axis=alt.Axis(title="Lap", titleFontWeight="bold", tickMinStep=1, format="d"),
                                         scale=alt.Scale(zero=False, nice=True)),
                                 y=alt.Y("Δ vs Best (s):Q",
-                                        axis=alt.Axis(title="Δ (s)"),
+                                        axis=alt.Axis(title="Δ (s)", titleFontWeight="bold"),
                                         scale=alt.Scale(domain=[lo, hi], zero=False, nice=True)),
                                 color=alt.Color("SeriesKey:N", scale=color_scale, legend=None),
                                 detail="SeriesKey:N"
@@ -2046,10 +2046,10 @@ with tab3:
                             .mark_line(clip=True)
                             .encode(
                                 x=alt.X("Lap:Q",
-                                        axis=alt.Axis(title="Lap", tickMinStep=1, format="d"),
+                                        axis=alt.Axis(title="Lap", titleFontWeight="bold", tickMinStep=1, format="d"),
                                         scale=alt.Scale(zero=False, nice=True)),
                                 y=alt.Y("Gap (s):Q",
-                                        axis=alt.Axis(title="Slower ← Gap (s) → Faster"),
+                                        axis=alt.Axis(title="Slower ← Gap (s) → Faster", titleFontWeight="bold"),
                                         scale=alt.Scale(domain=[lo, hi], reverse=True, nice=True)),
                                 color=alt.Color("SeriesKey:N", scale=color_scale, legend=None),
                                 detail="SeriesKey:N"
@@ -2069,7 +2069,7 @@ with tab3:
                     even_split = max(s + 1, min(even_split, e - 1))  # clamp to valid range
 
                     # User can change the center of the table, but deltas are always vs even split
-                    center_lap = st.number_input("Center pit lap",
+                    center_lap = st.number_input("Desired Pit Lap",
                                                  min_value=s + 1, max_value=max(s + 1, e - 1),
                                                  value=even_split,
                                                  step=1, key=f"whatif_{tab_idx}")
@@ -2116,7 +2116,11 @@ with tab3:
                             if row.name == even_row_idx:
                                 return ['font-weight: bold'] * len(row)
                             return [''] * len(row)
-                        styled = wdf.style.apply(highlight_even, axis=1).format({"Initial Δ (s)": "{:.2f}", "Final Δ (s)": "{:.2f}"})
+                        styled = (wdf.style
+                            .apply(highlight_even, axis=1)
+                            .format({"Initial Δ (s)": "{:.2f}", "Final Δ (s)": "{:.2f}"})
+                            .set_table_styles([{'selector': 'th', 'props': [('font-weight', 'bold')]}])
+                        )
                         # Calculate height to fit all rows without scrolling (header + rows * ~35px per row)
                         table_height = (len(rows) + 1) * 35 + 3
                         st.dataframe(styled, hide_index=True, use_container_width=True, height=table_height)
@@ -2159,10 +2163,10 @@ with tab3:
                     alt.Chart(df_inst)
                     .mark_line(clip=True)
                     .encode(
-                        x=alt.X("Lap:Q", axis=alt.Axis(title="Lap", tickMinStep=1, format="d"),
+                        x=alt.X("Lap:Q", axis=alt.Axis(title="Lap", titleFontWeight="bold", tickMinStep=1, format="d"),
                                 scale=alt.Scale(zero=False, nice=True)),
                         y=alt.Y("Δ Lap Time (A − B) (s):Q",
-                                axis=alt.Axis(title="Δ Lap T (s)"),
+                                axis=alt.Axis(title="Δ Lap T (s)", titleFontWeight="bold"),
                                 scale=alt.Scale(domain=[lo2, hi2], zero=False, nice=True)),
                         tooltip=[alt.Tooltip("Lap:Q", format="d"),
                                  alt.Tooltip("Δ Lap Time (A − B) (s):Q", format=".3f")],
@@ -2252,9 +2256,9 @@ with tab3:
             zero = alt.Chart(pd.DataFrame({"y": [0.0]})).mark_rule(strokeDash=[3, 3]).encode(y="y:Q")
             ch = (
                 alt.Chart(df).mark_line(clip=True).encode(
-                    x=alt.X("Laps:Q", axis=alt.Axis(title="Stint Length (laps)", tickMinStep=1, format="d")),
+                    x=alt.X("Laps:Q", axis=alt.Axis(title="Stint Length (laps)", titleFontWeight="bold", tickMinStep=1, format="d")),
                     y=alt.Y("Δ (NS − ES) (s):Q",
-                            axis=alt.Axis(title="Δ (s)"),
+                            axis=alt.Axis(title="Δ (s)", titleFontWeight="bold"),
                             scale=alt.Scale(domain=[lo, hi], zero=False, nice=True)),
                     tooltip=[alt.Tooltip("Laps:Q", format="d"),
                              alt.Tooltip("Δ (NS − ES) (s):Q", format=".2f")],
