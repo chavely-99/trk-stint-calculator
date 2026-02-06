@@ -1736,6 +1736,24 @@ with tab_results:
             dup_ls = set([x for x in all_ls_ids if x > 0 and all_ls_ids.count(x) > 1])
             dup_rs = set([x for x in all_rs_ids if x > 0 and all_rs_ids.count(x) > 1])
 
+            # Find missing IDs if duplicates exist
+            missing_ls = set()
+            missing_rs = set()
+            if dup_ls or dup_rs:
+                # Get available IDs from tire pools
+                left_pool = st.session_state.get('left_tires', pd.DataFrame())
+                right_pool = st.session_state.get('right_tires', pd.DataFrame())
+
+                if not left_pool.empty and 'Number' in left_pool.columns:
+                    available_ls = set([int(x) for x in left_pool['Number'].dropna() if x > 0])
+                    used_ls = set([x for x in all_ls_ids if x > 0])
+                    missing_ls = available_ls - used_ls
+
+                if not right_pool.empty and 'Number' in right_pool.columns:
+                    available_rs = set([int(x) for x in right_pool['Number'].dropna() if x > 0])
+                    used_rs = set([x for x in all_rs_ids if x > 0])
+                    missing_rs = available_rs - used_rs
+
             # Second pass: build table with duplicate markers
             for data in all_tire_data:
                 set_idx = data['set_idx']
@@ -1787,6 +1805,20 @@ with tab_results:
                 row_metadata.append({'set_idx': set_idx, 'position': 'rear', 'ls_num': lr_num, 'rs_num': rr_num})
 
             df = pd.DataFrame(table_rows)
+
+            # Display duplicate and missing ID warnings
+            if dup_ls or dup_rs or missing_ls or missing_rs:
+                warning_parts = []
+                if dup_ls:
+                    warning_parts.append(f"**Duplicate LS:** {', '.join(map(str, sorted(dup_ls)))}")
+                if dup_rs:
+                    warning_parts.append(f"**Duplicate RS:** {', '.join(map(str, sorted(dup_rs)))}")
+                if missing_ls:
+                    warning_parts.append(f"**Missing LS:** {', '.join(map(str, sorted(missing_ls)))}")
+                if missing_rs:
+                    warning_parts.append(f"**Missing RS:** {', '.join(map(str, sorted(missing_rs)))}")
+
+                st.warning("⚠️ " + " | ".join(warning_parts))
 
             # Display full-length table with high contrast styling
             # Custom CSS for better contrast
