@@ -1820,8 +1820,7 @@ with tab_results:
 
                 st.warning("⚠️ " + " | ".join(warning_parts))
 
-            # Display full-length table with high contrast styling
-            # Custom CSS for better contrast
+            # Display full-length table with enhanced visual grouping
             st.markdown("""
             <style>
             div[data-testid="stDataFrame"] {
@@ -1840,6 +1839,24 @@ with tab_results:
             div[data-testid="stDataFrame"] td {
                 border: 2px solid #666 !important;
                 padding: 6px !important;
+            }
+
+            /* Alternating set backgrounds - every pair of rows */
+            div[data-testid="stDataFrame"] tbody tr:nth-child(4n+1),
+            div[data-testid="stDataFrame"] tbody tr:nth-child(4n+2) {
+                background-color: #f8f8f8 !important;  /* Light gray for sets 1,3,5,7... */
+            }
+            div[data-testid="stDataFrame"] tbody tr:nth-child(4n+3),
+            div[data-testid="stDataFrame"] tbody tr:nth-child(4n+4) {
+                background-color: #ffffff !important;  /* White for sets 2,4,6,8... */
+            }
+
+            /* Enhanced Set # column - provides vertical anchor */
+            div[data-testid="stDataFrame"] tbody td:first-child {
+                background-color: #d0e8f2 !important;  /* Light blue */
+                font-weight: bold !important;
+                font-size: 14px !important;
+                border-right: 4px solid #1f77b4 !important;
             }
             </style>
             """, unsafe_allow_html=True)
