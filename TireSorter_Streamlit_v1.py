@@ -1584,12 +1584,14 @@ with tab_results:
         stats = st.session_state.stats
         has_results = True
 
-        # --- Check for duplicate tires in solution ---
-        sol_warnings = detect_solution_duplicates(solution)
-        if sol_warnings:
-            st.error("⚠️ Duplicate tires detected in solution:")
-            for warning in sol_warnings:
-                st.error(warning)
+        # --- Check for duplicate tires in solution (only in normal view) ---
+        # In compact view, duplicates are detected and shown inline with the table
+        if not st.session_state.compact_view:
+            sol_warnings = detect_solution_duplicates(solution)
+            if sol_warnings:
+                st.error("⚠️ Duplicate tires detected in solution:")
+                for warning in sol_warnings:
+                    st.error(warning)
 
         # --- Refine toolbar ---
         rate_pref = st.session_state.rate_preference
@@ -1720,22 +1722,52 @@ with tab_results:
             row_metadata = []  # Track set_idx and position (front/rear) for each row
             all_ls_ids = []
             all_rs_ids = []
+            all_tire_data = []  # Store tire data for duplicate checking
 
+            # First pass: collect all IDs
             for set_idx, s in enumerate(solution):
                 lf = s['lf_data']
                 rf = s['rf_data']
                 lr = s['lr_data']
                 rr = s['rr_data']
 
-                # Front row
                 lf_num = int(lf['Number']) if 'Number' in lf.index else 0
                 rf_num = int(rf['Number']) if 'Number' in rf.index else 0
-                all_ls_ids.append(lf_num)
-                all_rs_ids.append(rf_num)
+                lr_num = int(lr['Number']) if 'Number' in lr.index else 0
+                rr_num = int(rr['Number']) if 'Number' in rr.index else 0
+
+                all_tire_data.append({
+                    'set_idx': set_idx,
+                    'lf_num': lf_num, 'rf_num': rf_num,
+                    'lr_num': lr_num, 'rr_num': rr_num,
+                    'tires': (lf, rf, lr, rr)
+                })
+                all_ls_ids.extend([lf_num, lr_num])
+                all_rs_ids.extend([rf_num, rr_num])
+
+            # Detect duplicates
+            dup_ls = set([x for x in all_ls_ids if x > 0 and all_ls_ids.count(x) > 1])
+            dup_rs = set([x for x in all_rs_ids if x > 0 and all_rs_ids.count(x) > 1])
+
+            # Second pass: build table with duplicate markers
+            for data in all_tire_data:
+                set_idx = data['set_idx']
+                lf, rf, lr, rr = data['tires']
+                lf_num, rf_num = data['lf_num'], data['rf_num']
+                lr_num, rr_num = data['lr_num'], data['rr_num']
+                s = solution[set_idx]
+
+                # Add warning symbol to duplicates
+                lf_display = f"⚠️ {lf_num}" if lf_num in dup_ls else str(lf_num)
+                rf_display = f"⚠️ {rf_num}" if rf_num in dup_rs else str(rf_num)
+                lr_display = f"⚠️ {lr_num}" if lr_num in dup_ls else str(lr_num)
+                rr_display = f"⚠️ {rr_num}" if rr_num in dup_rs else str(rr_num)
+
+                # Front row
                 table_rows.append({
                     'Set': set_idx + 1,
-                    'LS ID': lf_num,
-                    'RS ID': rf_num,
+                    'LS ID': lf_display,
+                    'RS ID': rf_display,
                     'LS Rollout': int(lf['Rollout/Dia']),
                     'RS Rollout': int(rf['Rollout/Dia']),
                     'LS Rate': int(lf['Rate']),
@@ -1747,17 +1779,13 @@ with tab_results:
                     'Cross%': f"{s['cross']*100:.2f}",
                     'Stagger': f"{s.get('front_stagger', 0):.1f}"
                 })
-                row_metadata.append({'set_idx': set_idx, 'position': 'front'})
+                row_metadata.append({'set_idx': set_idx, 'position': 'front', 'ls_num': lf_num, 'rs_num': rf_num})
 
                 # Rear row
-                lr_num = int(lr['Number']) if 'Number' in lr.index else 0
-                rr_num = int(rr['Number']) if 'Number' in rr.index else 0
-                all_ls_ids.append(lr_num)
-                all_rs_ids.append(rr_num)
                 table_rows.append({
-                    'Set': '',  # Empty for merged appearance
-                    'LS ID': lr_num,
-                    'RS ID': rr_num,
+                    'Set': '',
+                    'LS ID': lr_display,
+                    'RS ID': rr_display,
                     'LS Rollout': int(lr['Rollout/Dia']),
                     'RS Rollout': int(rr['Rollout/Dia']),
                     'LS Rate': int(lr['Rate']),
@@ -1766,24 +1794,23 @@ with tab_results:
                     'RS Date': get_val(rr, 'Date Code'),
                     'LS Shift': get_val(lr, 'Shift'),
                     'RS Shift': get_val(rr, 'Shift'),
-                    'Cross%': '',  # Empty for merged appearance
+                    'Cross%': '',
                     'Stagger': f"{s['stagger']:.1f}"
                 })
-                row_metadata.append({'set_idx': set_idx, 'position': 'rear'})
+                row_metadata.append({'set_idx': set_idx, 'position': 'rear', 'ls_num': lr_num, 'rs_num': rr_num})
 
             df = pd.DataFrame(table_rows)
 
-            # Detect duplicate IDs
-            dup_ls = [x for x in all_ls_ids if x > 0 and all_ls_ids.count(x) > 1]
-            dup_rs = [x for x in all_rs_ids if x > 0 and all_rs_ids.count(x) > 1]
-
+            # Show concise duplicate warning if any
             if dup_ls or dup_rs:
-                dup_msg = "⚠️ **DUPLICATE IDs DETECTED:** "
+                dup_msg = "⚠️ **Duplicate IDs:** "
                 if dup_ls:
-                    dup_msg += f"LS: {', '.join(map(str, sorted(set(dup_ls))))} "
+                    dup_msg += f"LS: {', '.join(map(str, sorted(dup_ls)))}"
+                if dup_ls and dup_rs:
+                    dup_msg += " | "
                 if dup_rs:
-                    dup_msg += f"RS: {', '.join(map(str, sorted(set(dup_rs))))}"
-                st.error(dup_msg)
+                    dup_msg += f"RS: {', '.join(map(str, sorted(dup_rs)))}"
+                st.warning(dup_msg)
 
             # Display editable table with high contrast styling
             edited_df = st.data_editor(
@@ -1792,8 +1819,8 @@ with tab_results:
                 hide_index=True,
                 column_config={
                     'Set': st.column_config.TextColumn('Set #', width='small', disabled=True),
-                    'LS ID': st.column_config.NumberColumn('LS ID', width='small', min_value=0, max_value=9999),
-                    'RS ID': st.column_config.NumberColumn('RS ID', width='small', min_value=0, max_value=9999),
+                    'LS ID': st.column_config.TextColumn('LS ID', width='small'),
+                    'RS ID': st.column_config.TextColumn('RS ID', width='small'),
                     'LS Rollout': st.column_config.NumberColumn('LS Rollout', width='small', disabled=True),
                     'RS Rollout': st.column_config.NumberColumn('RS Rollout', width='small', disabled=True),
                     'LS Rate': st.column_config.NumberColumn('LS Rate', width='small', disabled=True),
@@ -1829,11 +1856,17 @@ with tab_results:
                     meta = row_metadata[row_idx]
                     set_idx = meta['set_idx']
                     is_front = meta['position'] == 'front'
+                    old_ls_num = meta['ls_num']
+                    old_rs_num = meta['rs_num']
 
-                    # Check LS ID change
-                    old_ls = df.at[row_idx, 'LS ID']
-                    new_ls = edited_df.at[row_idx, 'LS ID']
-                    if old_ls != new_ls and new_ls > 0:
+                    # Check LS ID change - strip warning symbols
+                    new_ls_str = str(edited_df.at[row_idx, 'LS ID']).replace('⚠️', '').strip()
+                    try:
+                        new_ls = int(new_ls_str)
+                    except (ValueError, TypeError):
+                        new_ls = 0
+
+                    if old_ls_num != new_ls and new_ls > 0:
                         corner = 'lf' if is_front else 'lr'
                         # Find tire with new ID in available pool
                         target_tire = None
@@ -1843,7 +1876,7 @@ with tab_results:
                             pool = left_pool
 
                         for _, tire in pool.iterrows():
-                            if 'Number' in tire.index and int(tire['Number']) == int(new_ls):
+                            if 'Number' in tire.index and int(tire['Number']) == new_ls:
                                 target_tire = tire
                                 break
 
@@ -1851,10 +1884,14 @@ with tab_results:
                             solution[set_idx][f'{corner}_data'] = target_tire
                             changes_detected = True
 
-                    # Check RS ID change
-                    old_rs = df.at[row_idx, 'RS ID']
-                    new_rs = edited_df.at[row_idx, 'RS ID']
-                    if old_rs != new_rs and new_rs > 0:
+                    # Check RS ID change - strip warning symbols
+                    new_rs_str = str(edited_df.at[row_idx, 'RS ID']).replace('⚠️', '').strip()
+                    try:
+                        new_rs = int(new_rs_str)
+                    except (ValueError, TypeError):
+                        new_rs = 0
+
+                    if old_rs_num != new_rs and new_rs > 0:
                         corner = 'rf' if is_front else 'rr'
                         # Find tire with new ID in available pool
                         target_tire = None
@@ -1864,7 +1901,7 @@ with tab_results:
                             pool = right_pool
 
                         for _, tire in pool.iterrows():
-                            if 'Number' in tire.index and int(tire['Number']) == int(new_rs):
+                            if 'Number' in tire.index and int(tire['Number']) == new_rs:
                                 target_tire = tire
                                 break
 
