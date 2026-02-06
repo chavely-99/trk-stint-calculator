@@ -1718,6 +1718,8 @@ with tab_results:
             # Build DataFrame for editable table
             table_rows = []
             row_metadata = []  # Track set_idx and position (front/rear) for each row
+            all_ls_ids = []
+            all_rs_ids = []
 
             for set_idx, s in enumerate(solution):
                 lf = s['lf_data']
@@ -1728,18 +1730,20 @@ with tab_results:
                 # Front row
                 lf_num = int(lf['Number']) if 'Number' in lf.index else 0
                 rf_num = int(rf['Number']) if 'Number' in rf.index else 0
+                all_ls_ids.append(lf_num)
+                all_rs_ids.append(rf_num)
                 table_rows.append({
                     'Set': set_idx + 1,
-                    'LF ID': lf_num,
-                    'RF ID': rf_num,
-                    'LF Roll': int(lf['Rollout/Dia']),
-                    'RF Roll': int(rf['Rollout/Dia']),
-                    'LF Rate': int(lf['Rate']),
-                    'RF Rate': int(rf['Rate']),
-                    'LF Date': get_val(lf, 'Date Code'),
-                    'RF Date': get_val(rf, 'Date Code'),
-                    'LF Shift': get_val(lf, 'Shift'),
-                    'RF Shift': get_val(rf, 'Shift'),
+                    'LS ID': lf_num,
+                    'RS ID': rf_num,
+                    'LS Rollout': int(lf['Rollout/Dia']),
+                    'RS Rollout': int(rf['Rollout/Dia']),
+                    'LS Rate': int(lf['Rate']),
+                    'RS Rate': int(rf['Rate']),
+                    'LS Date': get_val(lf, 'Date Code'),
+                    'RS Date': get_val(rf, 'Date Code'),
+                    'LS Shift': get_val(lf, 'Shift'),
+                    'RS Shift': get_val(rf, 'Shift'),
                     'Cross%': f"{s['cross']*100:.2f}",
                     'Stagger': f"{s.get('front_stagger', 0):.1f}"
                 })
@@ -1748,18 +1752,20 @@ with tab_results:
                 # Rear row
                 lr_num = int(lr['Number']) if 'Number' in lr.index else 0
                 rr_num = int(rr['Number']) if 'Number' in rr.index else 0
+                all_ls_ids.append(lr_num)
+                all_rs_ids.append(rr_num)
                 table_rows.append({
                     'Set': '',  # Empty for merged appearance
-                    'LF ID': lr_num,
-                    'RF ID': rr_num,
-                    'LF Roll': int(lr['Rollout/Dia']),
-                    'RF Roll': int(rr['Rollout/Dia']),
-                    'LF Rate': int(lr['Rate']),
-                    'RF Rate': int(rr['Rate']),
-                    'LF Date': get_val(lr, 'Date Code'),
-                    'RF Date': get_val(rr, 'Date Code'),
-                    'LF Shift': get_val(lr, 'Shift'),
-                    'RF Shift': get_val(rr, 'Shift'),
+                    'LS ID': lr_num,
+                    'RS ID': rr_num,
+                    'LS Rollout': int(lr['Rollout/Dia']),
+                    'RS Rollout': int(rr['Rollout/Dia']),
+                    'LS Rate': int(lr['Rate']),
+                    'RS Rate': int(rr['Rate']),
+                    'LS Date': get_val(lr, 'Date Code'),
+                    'RS Date': get_val(rr, 'Date Code'),
+                    'LS Shift': get_val(lr, 'Shift'),
+                    'RS Shift': get_val(rr, 'Shift'),
                     'Cross%': '',  # Empty for merged appearance
                     'Stagger': f"{s['stagger']:.1f}"
                 })
@@ -1767,23 +1773,35 @@ with tab_results:
 
             df = pd.DataFrame(table_rows)
 
-            # Display editable table
+            # Detect duplicate IDs
+            dup_ls = [x for x in all_ls_ids if x > 0 and all_ls_ids.count(x) > 1]
+            dup_rs = [x for x in all_rs_ids if x > 0 and all_rs_ids.count(x) > 1]
+
+            if dup_ls or dup_rs:
+                dup_msg = "⚠️ **DUPLICATE IDs DETECTED:** "
+                if dup_ls:
+                    dup_msg += f"LS: {', '.join(map(str, sorted(set(dup_ls))))} "
+                if dup_rs:
+                    dup_msg += f"RS: {', '.join(map(str, sorted(set(dup_rs))))}"
+                st.error(dup_msg)
+
+            # Display editable table with high contrast styling
             edited_df = st.data_editor(
                 df,
                 use_container_width=True,
                 hide_index=True,
                 column_config={
                     'Set': st.column_config.TextColumn('Set #', width='small', disabled=True),
-                    'LF ID': st.column_config.NumberColumn('LF ID', width='small', min_value=0, max_value=9999),
-                    'RF ID': st.column_config.NumberColumn('RF ID', width='small', min_value=0, max_value=9999),
-                    'LF Roll': st.column_config.NumberColumn('LF Roll', width='small', disabled=True),
-                    'RF Roll': st.column_config.NumberColumn('RF Roll', width='small', disabled=True),
-                    'LF Rate': st.column_config.NumberColumn('LF Rate', width='small', disabled=True),
-                    'RF Rate': st.column_config.NumberColumn('RF Rate', width='small', disabled=True),
-                    'LF Date': st.column_config.TextColumn('LF Date', width='small', disabled=True),
-                    'RF Date': st.column_config.TextColumn('RF Date', width='small', disabled=True),
-                    'LF Shift': st.column_config.TextColumn('LF Shift', width='small', disabled=True),
-                    'RF Shift': st.column_config.TextColumn('RF Shift', width='small', disabled=True),
+                    'LS ID': st.column_config.NumberColumn('LS ID', width='small', min_value=0, max_value=9999),
+                    'RS ID': st.column_config.NumberColumn('RS ID', width='small', min_value=0, max_value=9999),
+                    'LS Rollout': st.column_config.NumberColumn('LS Rollout', width='small', disabled=True),
+                    'RS Rollout': st.column_config.NumberColumn('RS Rollout', width='small', disabled=True),
+                    'LS Rate': st.column_config.NumberColumn('LS Rate', width='small', disabled=True),
+                    'RS Rate': st.column_config.NumberColumn('RS Rate', width='small', disabled=True),
+                    'LS Date': st.column_config.TextColumn('LS Date', width='small', disabled=True),
+                    'RS Date': st.column_config.TextColumn('RS Date', width='small', disabled=True),
+                    'LS Shift': st.column_config.TextColumn('LS Shift', width='small', disabled=True),
+                    'RS Shift': st.column_config.TextColumn('RS Shift', width='small', disabled=True),
                     'Cross%': st.column_config.TextColumn('Cross%', width='small', disabled=True),
                     'Stagger': st.column_config.TextColumn('Stagger', width='small', disabled=True),
                 },
@@ -1798,10 +1816,10 @@ with tab_results:
                     set_idx = meta['set_idx']
                     is_front = meta['position'] == 'front'
 
-                    # Check LF ID change
-                    old_lf = df.at[row_idx, 'LF ID']
-                    new_lf = edited_df.at[row_idx, 'LF ID']
-                    if old_lf != new_lf and new_lf > 0:
+                    # Check LS ID change
+                    old_ls = df.at[row_idx, 'LS ID']
+                    new_ls = edited_df.at[row_idx, 'LS ID']
+                    if old_ls != new_ls and new_ls > 0:
                         corner = 'lf' if is_front else 'lr'
                         # Find tire with new ID in available pool
                         target_tire = None
@@ -1811,7 +1829,7 @@ with tab_results:
                             pool = left_tires
 
                         for tire in pool:
-                            if 'Number' in tire.index and int(tire['Number']) == int(new_lf):
+                            if 'Number' in tire.index and int(tire['Number']) == int(new_ls):
                                 target_tire = tire
                                 break
 
@@ -1819,10 +1837,10 @@ with tab_results:
                             solution[set_idx][f'{corner}_data'] = target_tire
                             changes_detected = True
 
-                    # Check RF ID change
-                    old_rf = df.at[row_idx, 'RF ID']
-                    new_rf = edited_df.at[row_idx, 'RF ID']
-                    if old_rf != new_rf and new_rf > 0:
+                    # Check RS ID change
+                    old_rs = df.at[row_idx, 'RS ID']
+                    new_rs = edited_df.at[row_idx, 'RS ID']
+                    if old_rs != new_rs and new_rs > 0:
                         corner = 'rf' if is_front else 'rr'
                         # Find tire with new ID in available pool
                         target_tire = None
@@ -1832,7 +1850,7 @@ with tab_results:
                             pool = right_tires
 
                         for tire in pool:
-                            if 'Number' in tire.index and int(tire['Number']) == int(new_rf):
+                            if 'Number' in tire.index and int(tire['Number']) == int(new_rs):
                                 target_tire = tire
                                 break
 
