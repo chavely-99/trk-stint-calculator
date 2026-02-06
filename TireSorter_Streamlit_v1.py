@@ -118,30 +118,80 @@ button[kind="primary"]:hover {
     border-color: #1b5e20 !important;
 }
 
-/* Compact view styling for 10+ sets */
-.tire-box.compact {
-    padding: 6px;
-    font-size: 11px;
+/* Compact table view styling for 10+ sets */
+.compact-set-container {
+    border: 2px solid #999;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 16px;
+    background: #fafafa;
 }
-.tire-box.compact .tire-corner {
-    font-size: 13px;
-    margin-bottom: 2px;
+.compact-set-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #ddd;
 }
-.tire-box.compact .tire-rollout {
+.compact-set-title {
+    font-weight: bold;
     font-size: 16px;
+    color: #333;
 }
-.tire-box.compact .tire-rate {
-    font-size: 14px;
+.compact-set-metrics {
+    display: flex;
+    gap: 20px;
+    font-size: 13px;
+    color: #555;
 }
-.tire-box.compact .tire-shift {
-    font-size: 12px;
+.compact-set-metrics b {
+    color: #222;
 }
-.tire-box.compact .tire-date {
+.compact-tires-row {
+    display: flex;
+    gap: 8px;
+    margin: 8px 0;
+}
+.tire-box.compact-table {
+    flex: 1;
+    padding: 6px 8px;
     font-size: 11px;
+    min-height: auto;
+    cursor: pointer;
 }
-.car-stats.compact {
+.tire-box.compact-table .tire-corner {
     font-size: 12px;
-    padding: 4px 8px;
+    font-weight: bold;
+    margin-bottom: 3px;
+}
+.tire-box.compact-table .tire-label {
+    display: inline-block;
+    width: 32px;
+    font-size: 10px;
+}
+.tire-box.compact-table .tire-rollout {
+    font-size: 13px;
+    font-weight: bold;
+}
+.tire-box.compact-table .tire-rate {
+    font-size: 12px;
+}
+.tire-box.compact-table .tire-shift,
+.tire-box.compact-table .tire-date {
+    font-size: 10px;
+}
+.compact-set-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid #ddd;
+    font-size: 12px;
+    color: #555;
+}
+.compact-set-footer b {
+    color: #222;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -1232,9 +1282,9 @@ def render_tire_html(tire, corner: str, highlight: bool = False, road_course: bo
         # Oval: color by side — left green, right blue
         css_class = "left" if corner in ('LF', 'LR') else "right"
 
-    # Add compact class if enabled
+    # Add compact-table class for table view
     if compact:
-        css_class += " compact"
+        css_class += " compact-table"
 
     shift = tire.get('Shift', '') or '-'
     date = tire.get('Date Code', '')
@@ -1658,80 +1708,141 @@ with tab_results:
 
         # --- Interactive car cards grid ---
         is_compact = st.session_state.compact_view
+        is_road_results = st.session_state.track_type == 'Road Course'
+
         if is_compact:
-            n_cols = min(len(solution), 8) if len(solution) >= 12 else min(len(solution), 6)
-        else:
-            n_cols = min(len(solution), 5)
-
-        cols = st.columns(n_cols)
-
-        for set_idx, s in enumerate(solution):
-            col_idx = set_idx % n_cols
-            with cols[col_idx]:
-                with st.container(border=True):
-                    # Set header — clickable for set-level swap
-                    is_set_sel = selected_set == set_idx
-                    if st.button(f"Set {set_idx + 1}", key=f"setswap_{set_idx}",
-                                 use_container_width=True,
-                                 type="primary" if is_set_sel else "secondary"):
-                        if selected_set is None:
-                            st.session_state.selected_set = set_idx
-                            st.session_state.selected_tire = None
-                        elif is_set_sel:
-                            st.session_state.selected_set = None
-                        else:
-                            do_set_swap(selected_set, set_idx)
-                        st.rerun()
-
-                    # Stats bar
+            # --- COMPACT TABLE VIEW ---
+            for set_idx, s in enumerate(solution):
+                with st.container():
+                    # Header with Set #, Front Stagger, Cross
                     st.markdown(
-                        f'<div class="car-stats{" compact" if is_compact else ""}">'
-                        f'R.Stag: {s["stagger"]:.1f} &nbsp;|&nbsp; '
-                        f'F.Stag: {s.get("front_stagger", 0):.1f} &nbsp;|&nbsp; '
-                        f'Cross: {s["cross"]*100:.2f}%'
+                        f'<div class="compact-set-container">'
+                        f'<div class="compact-set-header">'
+                        f'<div class="compact-set-title">Set {set_idx + 1}</div>'
+                        f'<div class="compact-set-metrics">'
+                        f'<span><b>F.Stag:</b> {s.get("front_stagger", 0):.1f}</span>'
+                        f'<span><b>Cross:</b> {s["cross"]*100:.2f}%</span>'
+                        f'</div>'
                         f'</div>',
                         unsafe_allow_html=True
                     )
 
-                    # 2x2 tire grid — matches car layout
-                    tire_rows = [
-                        ('LF', 'lf_data', 'RF', 'rf_data'),
-                        ('LR', 'lr_data', 'RR', 'rr_data'),
-                    ]
-                    is_road_results = st.session_state.track_type == 'Road Course'
-                    for l_corner, l_key, r_corner, r_key in tire_rows:
-                        left_col, right_col = st.columns(2)
-                        for col, corner, tire_key in [(left_col, l_corner, l_key), (right_col, r_corner, r_key)]:
-                            with col:
-                                is_sel = selected == (set_idx, corner)
-                                st.markdown(
-                                    render_tire_html(s[tire_key], corner, highlight=is_sel,
-                                                   road_course=is_road_results, compact=is_compact),
-                                    unsafe_allow_html=True
-                                )
-                                btn_type = "primary" if is_sel else "secondary"
-                                if st.button(corner, key=f"tire_{set_idx}_{corner}",
-                                             use_container_width=True, type=btn_type):
-                                    st.session_state.selected_set = None
-                                    if selected is None:
-                                        st.session_state.selected_tire = (set_idx, corner)
-                                    elif is_sel:
-                                        st.session_state.selected_tire = None
+                    # Horizontal row of 4 tires
+                    tire_cols = st.columns(4)
+                    corners = ['LF', 'RF', 'LR', 'RR']
+                    tire_keys = ['lf_data', 'rf_data', 'lr_data', 'rr_data']
+
+                    for col, corner, tire_key in zip(tire_cols, corners, tire_keys):
+                        with col:
+                            is_sel = selected == (set_idx, corner)
+                            st.markdown(
+                                render_tire_html(s[tire_key], corner, highlight=is_sel,
+                                               road_course=is_road_results, compact=True),
+                                unsafe_allow_html=True
+                            )
+                            btn_type = "primary" if is_sel else "secondary"
+                            if st.button(corner, key=f"tire_{set_idx}_{corner}",
+                                       use_container_width=True, type=btn_type):
+                                st.session_state.selected_set = None
+                                if selected is None:
+                                    st.session_state.selected_tire = (set_idx, corner)
+                                elif is_sel:
+                                    st.session_state.selected_tire = None
+                                else:
+                                    # Enforce pool constraints
+                                    from_corner = selected[1]
+                                    if is_road_results:
+                                        pool_a = {'LR', 'RF'}
+                                        same_pool = (from_corner in pool_a) == (corner in pool_a)
                                     else:
-                                        # Enforce pool constraints on manual swaps
-                                        from_corner = selected[1]
-                                        if is_road_results:
-                                            pool_a = {'LR', 'RF'}
-                                            same_pool = (from_corner in pool_a) == (corner in pool_a)
-                                        else:
-                                            left_pool = {'LF', 'LR'}
-                                            same_pool = (from_corner in left_pool) == (corner in left_pool)
-                                        if same_pool:
-                                            do_swap(selected[0], selected[1], set_idx, corner)
-                                        else:
+                                        left_pool = {'LF', 'LR'}
+                                        same_pool = (from_corner in left_pool) == (corner in left_pool)
+                                    if same_pool:
+                                        do_swap(selected[0], selected[1], set_idx, corner)
+                                    else:
+                                        st.session_state.selected_tire = None
+                                        st.toast(f"Can't swap {from_corner} with {corner} — different pools")
+                                st.rerun()
+
+                    # Footer with Rear Stagger
+                    st.markdown(
+                        f'<div class="compact-set-footer">'
+                        f'<span><b>R.Stag:</b> {s["stagger"]:.1f}</span>'
+                        f'</div>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+        else:
+            # --- NORMAL CARD VIEW ---
+            n_cols = min(len(solution), 5)
+            cols = st.columns(n_cols)
+
+            for set_idx, s in enumerate(solution):
+                col_idx = set_idx % n_cols
+                with cols[col_idx]:
+                    with st.container(border=True):
+                        # Set header — clickable for set-level swap
+                        is_set_sel = selected_set == set_idx
+                        if st.button(f"Set {set_idx + 1}", key=f"setswap_{set_idx}",
+                                     use_container_width=True,
+                                     type="primary" if is_set_sel else "secondary"):
+                            if selected_set is None:
+                                st.session_state.selected_set = set_idx
+                                st.session_state.selected_tire = None
+                            elif is_set_sel:
+                                st.session_state.selected_set = None
+                            else:
+                                do_set_swap(selected_set, set_idx)
+                            st.rerun()
+
+                        # Stats bar
+                        st.markdown(
+                            f'<div class="car-stats">'
+                            f'R.Stag: {s["stagger"]:.1f} &nbsp;|&nbsp; '
+                            f'F.Stag: {s.get("front_stagger", 0):.1f} &nbsp;|&nbsp; '
+                            f'Cross: {s["cross"]*100:.2f}%'
+                            f'</div>',
+                            unsafe_allow_html=True
+                        )
+
+                        # 2x2 tire grid — matches car layout
+                        tire_rows = [
+                            ('LF', 'lf_data', 'RF', 'rf_data'),
+                            ('LR', 'lr_data', 'RR', 'rr_data'),
+                        ]
+                        for l_corner, l_key, r_corner, r_key in tire_rows:
+                            left_col, right_col = st.columns(2)
+                            for col, corner, tire_key in [(left_col, l_corner, l_key), (right_col, r_corner, r_key)]:
+                                with col:
+                                    is_sel = selected == (set_idx, corner)
+                                    st.markdown(
+                                        render_tire_html(s[tire_key], corner, highlight=is_sel,
+                                                       road_course=is_road_results, compact=False),
+                                        unsafe_allow_html=True
+                                    )
+                                    btn_type = "primary" if is_sel else "secondary"
+                                    if st.button(corner, key=f"tire_{set_idx}_{corner}",
+                                                 use_container_width=True, type=btn_type):
+                                        st.session_state.selected_set = None
+                                        if selected is None:
+                                            st.session_state.selected_tire = (set_idx, corner)
+                                        elif is_sel:
                                             st.session_state.selected_tire = None
-                                            st.toast(f"Can't swap {from_corner} with {corner} — different pools")
-                                    st.rerun()
+                                        else:
+                                            # Enforce pool constraints on manual swaps
+                                            from_corner = selected[1]
+                                            if is_road_results:
+                                                pool_a = {'LR', 'RF'}
+                                                same_pool = (from_corner in pool_a) == (corner in pool_a)
+                                            else:
+                                                left_pool = {'LF', 'LR'}
+                                                same_pool = (from_corner in left_pool) == (corner in left_pool)
+                                            if same_pool:
+                                                do_swap(selected[0], selected[1], set_idx, corner)
+                                            else:
+                                                st.session_state.selected_tire = None
+                                                st.toast(f"Can't swap {from_corner} with {corner} — different pools")
+                                        st.rerun()
 
         st.divider()
 
