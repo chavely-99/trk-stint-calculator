@@ -165,68 +165,61 @@ button[kind="primary"]:hover {
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
-    gap: 2px;
+    gap: 1px;
     width: 100%;
-    max-width: 280px;
+    max-width: 250px;
     margin: 0 auto;
 }
 .compact-tire {
-    background: #fafafa;
-    border: 1px solid #ddd;
-    border-radius: 3px;
-    padding: 3px;
+    background: transparent;
+    border: none;
+    border-left: 2px solid transparent;
+    padding: 2px 4px;
     cursor: pointer;
     font-size: 9px;
-    line-height: 1.2;
+    line-height: 1.3;
     text-align: center;
-    min-height: 50px;
 }
 .compact-tire:hover {
     background: #fff9c4;
 }
 .compact-tire.selected {
     background: #c8e6c9;
-    border: 2px solid #2e7d32;
 }
 .compact-tire.left {
-    border-left: 3px solid #FF13F0;
-    background: #fff0fd;
+    border-left: 2px solid #FF13F0;
 }
 .compact-tire.right {
-    border-left: 3px solid #9E9E9E;
-    background: #f5f5f5;
+    border-left: 2px solid #9E9E9E;
 }
 .compact-tire.pool-a {
-    border-left: 3px solid #F57C00;
-    background: #fff8f0;
+    border-left: 2px solid #F57C00;
 }
 .compact-tire.pool-b {
-    border-left: 3px solid #00897B;
-    background: #f0faf9;
+    border-left: 2px solid #00897B;
 }
 .compact-tire .tire-corner {
     font-weight: bold;
-    font-size: 9px;
-    color: #555;
-    margin-bottom: 1px;
+    font-size: 8px;
+    color: #666;
 }
 .compact-tire .tire-rollout {
     font-weight: bold;
-    font-size: 13px;
-    color: #1976d2;
+    font-size: 11px;
+    color: #000;
 }
 .compact-tire .tire-rate {
-    font-weight: bold;
-    font-size: 11px;
-    color: #d32f2f;
+    font-weight: 600;
+    font-size: 10px;
+    color: #333;
 }
 .compact-tire .tire-shift {
-    font-size: 9px;
-    color: #7b1fa2;
-}
-.compact-tire .tire-date {
     font-size: 8px;
     color: #666;
+}
+.compact-tire .tire-date {
+    font-size: 7px;
+    color: #999;
 }
 </style>
 """, unsafe_allow_html=True)
