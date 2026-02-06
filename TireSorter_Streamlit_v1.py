@@ -122,23 +122,24 @@ button[kind="primary"]:hover {
 .compact-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 11px;
-    margin-bottom: 20px;
+    font-size: 10px;
+    margin-bottom: 15px;
 }
 .compact-table th {
     background: #2e7d32;
     color: white;
-    padding: 6px 8px;
+    padding: 4px 6px;
     text-align: center;
     font-weight: bold;
     border: 1px solid #ddd;
-    font-size: 11px;
+    font-size: 10px;
 }
 .compact-table td {
-    padding: 4px 6px;
+    padding: 2px 4px;
     border: 1px solid #ddd;
     text-align: center;
-    font-size: 10px;
+    font-size: 9px;
+    vertical-align: middle;
 }
 .compact-table tr:nth-child(even) {
     background: #f9f9f9;
@@ -149,46 +150,83 @@ button[kind="primary"]:hover {
 .compact-table .set-col {
     font-weight: bold;
     background: #f0f0f0;
-}
-.compact-table .tire-cell {
-    cursor: pointer;
-    padding: 6px 8px;
-}
-.compact-table .tire-cell:hover {
-    background: #fff9c4;
-}
-.compact-table .tire-cell.selected {
-    background: #c8e6c9;
-    border: 2px solid #2e7d32;
-}
-.compact-table .tire-cell.left {
-    border-left: 3px solid #FF13F0;
-}
-.compact-table .tire-cell.right {
-    border-left: 3px solid #9E9E9E;
-}
-.compact-table .tire-cell.pool-a {
-    border-left: 3px solid #F57C00;
-}
-.compact-table .tire-cell.pool-b {
-    border-left: 3px solid #00897B;
-}
-.compact-table .tire-corner {
-    font-weight: bold;
-    font-size: 10px;
-    color: #666;
-}
-.compact-table .tire-values {
     font-size: 11px;
-    line-height: 1.3;
-}
-.compact-table .tire-rollout {
-    font-weight: bold;
-    color: #000;
 }
 .compact-table .metric-col {
     font-weight: bold;
+    font-size: 10px;
+}
+.compact-table .tire-grid-cell {
+    padding: 2px;
+}
+
+/* 2x2 tire grid within table cell */
+.compact-tire-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 2px;
+    width: 100%;
+    max-width: 280px;
+    margin: 0 auto;
+}
+.compact-tire {
+    background: #fafafa;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    padding: 3px;
+    cursor: pointer;
+    font-size: 9px;
+    line-height: 1.2;
+    text-align: center;
+    min-height: 50px;
+}
+.compact-tire:hover {
+    background: #fff9c4;
+}
+.compact-tire.selected {
+    background: #c8e6c9;
+    border: 2px solid #2e7d32;
+}
+.compact-tire.left {
+    border-left: 3px solid #FF13F0;
+    background: #fff0fd;
+}
+.compact-tire.right {
+    border-left: 3px solid #9E9E9E;
+    background: #f5f5f5;
+}
+.compact-tire.pool-a {
+    border-left: 3px solid #F57C00;
+    background: #fff8f0;
+}
+.compact-tire.pool-b {
+    border-left: 3px solid #00897B;
+    background: #f0faf9;
+}
+.compact-tire .tire-corner {
+    font-weight: bold;
+    font-size: 9px;
+    color: #555;
+    margin-bottom: 1px;
+}
+.compact-tire .tire-rollout {
+    font-weight: bold;
+    font-size: 13px;
+    color: #1976d2;
+}
+.compact-tire .tire-rate {
+    font-weight: bold;
     font-size: 11px;
+    color: #d32f2f;
+}
+.compact-tire .tire-shift {
+    font-size: 9px;
+    color: #7b1fa2;
+}
+.compact-tire .tire-date {
+    font-size: 8px;
+    color: #666;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -1709,11 +1747,11 @@ with tab_results:
 
         if is_compact:
             # --- COMPACT TABLE VIEW ---
-            # Build HTML table
+            # Build HTML table with 2x2 tire grid in single cell
             table_html = '<table class="compact-table"><thead><tr>'
             table_html += '<th class="set-col">Set</th>'
             table_html += '<th class="metric-col">F.Stag</th>'
-            table_html += '<th>LF</th><th>RF</th><th>LR</th><th>RR</th>'
+            table_html += '<th>Tires</th>'
             table_html += '<th class="metric-col">R.Stag</th>'
             table_html += '<th class="metric-col">Cross %</th>'
             table_html += '</tr></thead><tbody>'
@@ -1727,7 +1765,10 @@ with tab_results:
                 # Front stagger
                 table_html += f'<td class="metric-col">{s.get("front_stagger", 0):.1f}</td>'
 
-                # Four tires
+                # 2x2 Tire grid in single cell
+                table_html += '<td class="tire-grid-cell"><div class="compact-tire-grid">'
+
+                # Corners in 2x2 layout: LF, RF (top row), LR, RR (bottom row)
                 corners = ['LF', 'RF', 'LR', 'RR']
                 tire_keys = ['lf_data', 'rf_data', 'lr_data', 'rr_data']
 
@@ -1743,19 +1784,20 @@ with tab_results:
 
                     sel_class = " selected" if is_sel else ""
 
-                    # Tire cell content
+                    # Tire data
                     shift = tire.get('Shift', '') or '-'
                     date = tire.get('Date Code', '')
                     date_str = str(date).strip() if date and str(date).strip() not in ('', 'nan') else '-'
 
-                    table_html += f'<td class="tire-cell {color_class}{sel_class}" id="tire_{set_idx}_{corner}">'
+                    table_html += f'<div class="compact-tire {color_class}{sel_class}" id="tire_{set_idx}_{corner}">'
                     table_html += f'<div class="tire-corner">{corner}</div>'
-                    table_html += f'<div class="tire-values">'
                     table_html += f'<div class="tire-rollout">{tire["Rollout/Dia"]:.0f}</div>'
                     table_html += f'<div class="tire-rate">{int(tire["Rate"])}</div>'
-                    table_html += f'<div>{shift}</div>'
-                    table_html += f'<div>{date_str}</div>'
-                    table_html += f'</div></td>'
+                    table_html += f'<div class="tire-shift">{shift}</div>'
+                    table_html += f'<div class="tire-date">{date_str}</div>'
+                    table_html += '</div>'
+
+                table_html += '</div></td>'  # Close tire grid cell
 
                 # Rear stagger
                 table_html += f'<td class="metric-col">{s["stagger"]:.1f}</td>'
