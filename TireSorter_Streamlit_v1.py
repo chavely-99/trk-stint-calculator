@@ -1710,8 +1710,6 @@ with tab_results:
 
         if is_compact:
             # --- COMPACT TABLE VIEW (11 columns, 2 rows per set) ---
-            st.subheader("Tire Sets")
-
             # Helper to get tire data safely
             def get_val(tire, field, default='-'):
                 val = tire.get(field, default) if field in tire.index else default
@@ -1801,26 +1799,39 @@ with tab_results:
 
             df = pd.DataFrame(table_rows)
 
-            # Show concise duplicate warning if any
-            if dup_ls or dup_rs:
-                dup_msg = "⚠️ **Duplicate IDs:** "
-                if dup_ls:
-                    dup_msg += f"LS: {', '.join(map(str, sorted(dup_ls)))}"
-                if dup_ls and dup_rs:
-                    dup_msg += " | "
-                if dup_rs:
-                    dup_msg += f"RS: {', '.join(map(str, sorted(dup_rs)))}"
-                st.warning(dup_msg)
+            # Display full-length table with high contrast styling
+            # Custom CSS for better contrast
+            st.markdown("""
+            <style>
+            div[data-testid="stDataFrame"] {
+                border: 3px solid #333;
+            }
+            div[data-testid="stDataFrame"] table {
+                border-collapse: collapse;
+            }
+            div[data-testid="stDataFrame"] th {
+                background-color: #1f77b4 !important;
+                color: white !important;
+                font-weight: bold !important;
+                border: 2px solid #333 !important;
+                padding: 8px !important;
+            }
+            div[data-testid="stDataFrame"] td {
+                border: 2px solid #666 !important;
+                padding: 6px !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
 
-            # Display editable table with high contrast styling
             edited_df = st.data_editor(
                 df,
                 use_container_width=True,
                 hide_index=True,
+                height=None,  # Full length, no scrolling
                 column_config={
                     'Set': st.column_config.TextColumn('Set #', width='small', disabled=True),
-                    'LS ID': st.column_config.TextColumn('LS ID', width='small'),
-                    'RS ID': st.column_config.TextColumn('RS ID', width='small'),
+                    'LS ID': st.column_config.TextColumn('LS ID', width='medium'),
+                    'RS ID': st.column_config.TextColumn('RS ID', width='medium'),
                     'LS Rollout': st.column_config.NumberColumn('LS Rollout', width='small', disabled=True),
                     'RS Rollout': st.column_config.NumberColumn('RS Rollout', width='small', disabled=True),
                     'LS Rate': st.column_config.NumberColumn('LS Rate', width='small', disabled=True),
