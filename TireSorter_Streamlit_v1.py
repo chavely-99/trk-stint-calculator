@@ -1297,37 +1297,6 @@ def render_tire_html(tire, corner: str, highlight: bool = False, road_course: bo
     )
 
 
-def build_reference_table(solution: List[dict]) -> pd.DataFrame:
-    """Build sortable reference table from solution sets."""
-    rows = []
-    for idx, s in enumerate(solution):
-        rear_avg = s['rear_avg_rate']
-        front_avg = s['front_avg_rate']
-
-        def get_date(tire_data):
-            d = tire_data.get('Date Code', '')
-            return str(d).strip() if d and str(d) != 'nan' else '-'
-
-        dates = [get_date(s[k]) for k in ['lf_data', 'rf_data', 'lr_data', 'rr_data']]
-        newest_date = max([d for d in dates if d != '-']) if any(d != '-' for d in dates) else '-'
-
-        rows.append({
-            'Set': idx + 1,
-            'Rear Avg Rate': round(rear_avg, 1),
-            'Front Avg Rate': round(front_avg, 1),
-            'Stagger': round(s['stagger'], 1),
-            'Front Stagger': round(s.get('front_stagger', 0), 1),
-            'Cross %': round(s['cross'] * 100, 2),
-            'Newest Date': newest_date,
-            'LF Date': dates[0],
-            'RF Date': dates[1],
-            'LR Date': dates[2],
-            'RR Date': dates[3],
-        })
-
-    return pd.DataFrame(rows)
-
-
 # ============== SIDEBAR ==============
 st.sidebar.markdown("### Import Data")
 
@@ -1595,7 +1564,7 @@ with tab_results:
 
         # --- Refine toolbar ---
         rate_pref = st.session_state.rate_preference
-        btn_row = st.columns(5)
+        btn_row = st.columns(7)
 
         with btn_row[0]:
             refine_cross_clicked = st.button("Refine Cross", use_container_width=True, help="Optimize cross weight")
@@ -1607,6 +1576,10 @@ with tab_results:
             refine_rr_clicked = st.button("Refine RR", use_container_width=True, help="Consistent RR rollout")
         with btn_row[4]:
             refine_rate_clicked = st.button("Refine Rate", use_container_width=True, disabled=(rate_pref == 'None'), help="Softer front/rear preference")
+        with btn_row[5]:
+            softest_first_clicked = st.button("Softest First", use_container_width=True, help="Sort sets by average rate (softest to stiffest)")
+        with btn_row[6]:
+            stiffest_first_clicked = st.button("Stiffest First", use_container_width=True, help="Sort sets by average rate (stiffest to softest)")
 
         # --- Helper to update stats after refinement ---
         def _update_stats(solution):
@@ -1668,6 +1641,22 @@ with tab_results:
                 st.rerun()
             else:
                 st.toast(msg)
+
+        if softest_first_clicked:
+            # Sort sets by rear average rate (ascending - softest first)
+            solution_sorted = sorted(solution, key=lambda s: s['rear_avg_rate'])
+            st.session_state.results = solution_sorted
+            _update_stats(solution_sorted)
+            st.toast("Sets sorted: Softest to Stiffest")
+            st.rerun()
+
+        if stiffest_first_clicked:
+            # Sort sets by rear average rate (descending - stiffest first)
+            solution_sorted = sorted(solution, key=lambda s: s['rear_avg_rate'], reverse=True)
+            st.session_state.results = solution_sorted
+            _update_stats(solution_sorted)
+            st.toast("Sets sorted: Stiffest to Softest")
+            st.rerun()
 
         selected = st.session_state.selected_tire
         selected_set = st.session_state.selected_set
@@ -1827,6 +1816,7 @@ with tab_results:
                 df,
                 use_container_width=True,
                 hide_index=True,
+                height=len(df) * 45 + 50,  # Dynamic height: ~45px per row + 50px for header
                 column_config={
                     'Set': st.column_config.TextColumn('Set #', width='small', disabled=True),
                     'LS ID': st.column_config.TextColumn('LS ID', width='medium'),
@@ -2005,33 +1995,6 @@ with tab_results:
                                         st.rerun()
 
         st.divider()
-
-        # --- Reference Table ---
-        st.subheader("Reference Table")
-
-        ref_df = build_reference_table(solution)
-
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Sort: Softest Rear → Stiffest", use_container_width=True):
-                ref_df = ref_df.sort_values('Rear Avg Rate')
-        with col2:
-            if st.button("Sort: Newest → Oldest", use_container_width=True):
-                ref_df = ref_df.sort_values('Newest Date', ascending=False)
-
-        st.dataframe(
-            ref_df,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Set": st.column_config.NumberColumn("Set #", width="small"),
-                "Rear Avg Rate": st.column_config.NumberColumn("Rear Avg", format="%.1f"),
-                "Front Avg Rate": st.column_config.NumberColumn("Front Avg", format="%.1f"),
-                "Stagger": st.column_config.NumberColumn("Stagger", format="%.1f"),
-                "Front Stagger": st.column_config.NumberColumn("F.Stag", format="%.1f"),
-                "Cross %": st.column_config.NumberColumn("Cross %", format="%.2f"),
-            }
-        )
 
         st.divider()
 
