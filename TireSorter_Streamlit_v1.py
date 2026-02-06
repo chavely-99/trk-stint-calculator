@@ -1707,27 +1707,31 @@ with tab_results:
         is_road_results = st.session_state.track_type == 'Road Course'
 
         if is_compact:
-            # --- COMPACT TABLE VIEW (Simple 2x2 Grid with merged set numbers) ---
+            # --- COMPACT TABLE VIEW (11 columns, 2 rows per set) ---
             st.subheader("Tire Sets")
 
-            # Build simple HTML table with 2x2 tire grids
+            # Build simple table: 11 columns, 2 rows per set
             table_html = """<style>
-.grid-table { border-collapse: collapse; width: 100%; font-size: 10px; margin-bottom: 20px; }
-.grid-table th, .grid-table td { border: 1px solid #ccc; padding: 6px; text-align: center; }
-.grid-table th { background: #4CAF50; color: white; font-weight: bold; }
-.grid-table .set-cell { font-weight: bold; background: #e0e0e0; font-size: 12px; }
-.grid-table tr:nth-child(even) { background: #f9f9f9; }
+.compact-table { border-collapse: collapse; width: 100%; font-size: 10px; }
+.compact-table th, .compact-table td { border: 1px solid #ccc; padding: 4px; text-align: center; }
+.compact-table th { background: #4CAF50; color: white; font-weight: bold; position: sticky; top: 0; }
+.compact-table .set-cell { font-weight: bold; background: #e0e0e0; }
+.compact-table .id-cell { background: #f0f0f0; font-weight: bold; font-size: 9px; }
 </style>
-<table class="grid-table">
+<table class="compact-table">
 <thead><tr>
-<th>Set</th>
-<th>F.Stag</th>
-<th>R.Stag</th>
-<th>LF</th>
-<th>RF</th>
-<th>LR</th>
-<th>RR</th>
-<th>Cross%</th>
+<th>Set #</th>
+<th>ID Number</th>
+<th>Rollout</th>
+<th>Rollout</th>
+<th>Spring Rate</th>
+<th>Spring Rate</th>
+<th>Date Code</th>
+<th>Date Code</th>
+<th>Shift Code</th>
+<th>Shift Code</th>
+<th>Cross %</th>
+<th>Stagger</th>
 </tr></thead>
 <tbody>
 """
@@ -1738,21 +1742,44 @@ with tab_results:
                 lr = s['lr_data']
                 rr = s['rr_data']
 
-                def tire_cell(tire):
-                    num = int(tire['Number']) if 'Number' in tire.index else 0
-                    rollout = int(tire['Rollout/Dia'])
-                    rate = int(tire['Rate'])
-                    return f'<b>#{num}</b><br>{rollout}<br>{rate}'
+                # Helper to get tire data safely
+                def get_val(tire, field, default='-'):
+                    val = tire.get(field, default) if field in tire.index else default
+                    return str(val) if val and str(val) not in ['nan', 'None', ''] else '-'
 
+                # Front row (LF/RF)
+                lf_num = int(lf['Number']) if 'Number' in lf.index else '-'
+                rf_num = int(rf['Number']) if 'Number' in rf.index else '-'
                 table_html += f"""<tr>
-<td class="set-cell">{set_idx + 1}</td>
-<td>{s.get("front_stagger", 0):.1f}</td>
-<td>{s["stagger"]:.1f}</td>
-<td>{tire_cell(lf)}</td>
-<td>{tire_cell(rf)}</td>
-<td>{tire_cell(lr)}</td>
-<td>{tire_cell(rr)}</td>
-<td>{s["cross"]*100:.2f}</td>
+<td rowspan="2" class="set-cell">{set_idx + 1}</td>
+<td class="id-cell">{lf_num}, {rf_num}</td>
+<td>{int(lf['Rollout/Dia'])}</td>
+<td>{int(rf['Rollout/Dia'])}</td>
+<td>{int(lf['Rate'])}</td>
+<td>{int(rf['Rate'])}</td>
+<td>{get_val(lf, 'Date Code')}</td>
+<td>{get_val(rf, 'Date Code')}</td>
+<td>{get_val(lf, 'Shift')}</td>
+<td>{get_val(rf, 'Shift')}</td>
+<td rowspan="2">{s['cross']*100:.2f}</td>
+<td>{s.get('front_stagger', 0):.1f}</td>
+</tr>
+"""
+
+                # Rear row (LR/RR)
+                lr_num = int(lr['Number']) if 'Number' in lr.index else '-'
+                rr_num = int(rr['Number']) if 'Number' in rr.index else '-'
+                table_html += f"""<tr>
+<td class="id-cell">{lr_num}, {rr_num}</td>
+<td>{int(lr['Rollout/Dia'])}</td>
+<td>{int(rr['Rollout/Dia'])}</td>
+<td>{int(lr['Rate'])}</td>
+<td>{int(rr['Rate'])}</td>
+<td>{get_val(lr, 'Date Code')}</td>
+<td>{get_val(rr, 'Date Code')}</td>
+<td>{get_val(lr, 'Shift')}</td>
+<td>{get_val(rr, 'Shift')}</td>
+<td>{s['stagger']:.1f}</td>
 </tr>
 """
 
