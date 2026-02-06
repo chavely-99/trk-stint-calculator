@@ -1707,44 +1707,55 @@ with tab_results:
         is_road_results = st.session_state.track_type == 'Road Course'
 
         if is_compact:
-            # --- COMPACT EDITABLE TABLE VIEW ---
+            # --- COMPACT EDITABLE TABLE VIEW (2x2 Grid with blank rows) ---
             st.subheader("Tire Assignments (Edit to Swap)")
 
-            # Build DataFrame from solution
+            # Build DataFrame - 4 rows per set + blank row between sets
             df_rows = []
             for set_idx, s in enumerate(solution):
-                row = {
-                    'Set': set_idx + 1,
-                    'F.Stag': round(s.get('front_stagger', 0), 1),
-                    'R.Stag': round(s['stagger'], 1),
-                    'LF#': int(s['lf_data']['Number']) if 'Number' in s['lf_data'].index else 0,
-                    'RF#': int(s['rf_data']['Number']) if 'Number' in s['rf_data'].index else 0,
-                    'LR#': int(s['lr_data']['Number']) if 'Number' in s['lr_data'].index else 0,
-                    'RR#': int(s['rr_data']['Number']) if 'Number' in s['rr_data'].index else 0,
-                    'LF_Roll': int(s['lf_data']['Rollout/Dia']),
-                    'RF_Roll': int(s['rf_data']['Rollout/Dia']),
-                    'LR_Roll': int(s['lr_data']['Rollout/Dia']),
-                    'RR_Roll': int(s['rr_data']['Rollout/Dia']),
-                    'Cross%': round(s['cross'] * 100, 2),
-                }
-                df_rows.append(row)
+                corners = [
+                    ('LF', 'lf_data', True, False),   # (corner, data_key, show_fstag, show_rstag)
+                    ('RF', 'rf_data', False, False),
+                    ('LR', 'lr_data', False, True),
+                    ('RR', 'rr_data', False, False),
+                ]
+
+                for corner, data_key, show_fstag, show_rstag in corners:
+                    tire = s[data_key]
+                    row = {
+                        'Set': set_idx + 1 if corner == 'LF' else '',
+                        'Corner': corner,
+                        'Tire#': int(tire['Number']) if 'Number' in tire.index else 0,
+                        'Rollout': int(tire['Rollout/Dia']),
+                        'Rate': int(tire['Rate']),
+                        'Shift': tire.get('Shift', '') or '-',
+                        'Date': str(tire.get('Date Code', '')).strip() if str(tire.get('Date Code', '')).strip() not in ('', 'nan') else '-',
+                        'F.Stag': round(s.get('front_stagger', 0), 1) if show_fstag else '',
+                        'R.Stag': round(s['stagger'], 1) if show_rstag else '',
+                        'Cross%': round(s['cross'] * 100, 2) if corner == 'RR' else '',
+                    }
+                    df_rows.append(row)
+
+                # Add blank row between sets
+                df_rows.append({
+                    'Set': '', 'Corner': '', 'Tire#': None, 'Rollout': None, 'Rate': None,
+                    'Shift': '', 'Date': '', 'F.Stag': '', 'R.Stag': '', 'Cross%': ''
+                })
 
             df = pd.DataFrame(df_rows)
 
             # Editable columns configuration
             column_config = {
-                'Set': st.column_config.NumberColumn('Set', disabled=True, width='small'),
-                'F.Stag': st.column_config.NumberColumn('F.Stag', disabled=True, width='small'),
-                'R.Stag': st.column_config.NumberColumn('R.Stag', disabled=True, width='small'),
-                'LF#': st.column_config.NumberColumn('LF#', width='small'),
-                'RF#': st.column_config.NumberColumn('RF#', width='small'),
-                'LR#': st.column_config.NumberColumn('LR#', width='small'),
-                'RR#': st.column_config.NumberColumn('RR#', width='small'),
-                'LF_Roll': st.column_config.NumberColumn('LF Roll', disabled=True, width='small'),
-                'RF_Roll': st.column_config.NumberColumn('RF Roll', disabled=True, width='small'),
-                'LR_Roll': st.column_config.NumberColumn('LR Roll', disabled=True, width='small'),
-                'RR_Roll': st.column_config.NumberColumn('RR Roll', disabled=True, width='small'),
-                'Cross%': st.column_config.NumberColumn('Cross%', disabled=True, width='small'),
+                'Set': st.column_config.TextColumn('Set', disabled=True, width='small'),
+                'Corner': st.column_config.TextColumn('Corner', disabled=True, width='small'),
+                'Tire#': st.column_config.NumberColumn('Tire#', width='small'),
+                'Rollout': st.column_config.NumberColumn('Rollout', disabled=True, width='small'),
+                'Rate': st.column_config.NumberColumn('Rate', disabled=True, width='small'),
+                'Shift': st.column_config.TextColumn('Shift', disabled=True, width='small'),
+                'Date': st.column_config.TextColumn('Date', disabled=True, width='small'),
+                'F.Stag': st.column_config.TextColumn('F.Stag', disabled=True, width='small'),
+                'R.Stag': st.column_config.TextColumn('R.Stag', disabled=True, width='small'),
+                'Cross%': st.column_config.TextColumn('Cross%', disabled=True, width='small'),
             }
 
             edited_df = st.data_editor(
@@ -1756,11 +1767,9 @@ with tab_results:
             )
 
             # Validate for duplicates and missing numbers
-            all_nums = []
-            for col in ['LF#', 'RF#', 'LR#', 'RR#']:
-                all_nums.extend(edited_df[col].tolist())
+            all_nums = [int(n) for n in edited_df['Tire#'].dropna() if n != 0]
+            duplicates = [num for num in set(all_nums) if all_nums.count(num) > 1]
 
-            duplicates = [num for num in set(all_nums) if all_nums.count(num) > 1 and num != 0]
             original_nums = set()
             for s in solution:
                 for corner in ['lf_data', 'rf_data', 'lr_data', 'rr_data']:
@@ -1782,8 +1791,12 @@ with tab_results:
             # Copy to clipboard button
             if st.button("📋 Copy Tire Numbers to Clipboard", use_container_width=True):
                 clipboard_text = "Set\tLF\tRF\tLR\tRR\n"
-                for _, row in edited_df.iterrows():
-                    clipboard_text += f"{int(row['Set'])}\t{int(row['LF#'])}\t{int(row['RF#'])}\t{int(row['LR#'])}\t{int(row['RR#'])}\n"
+                # Group by sets (every 5 rows = 1 set + blank)
+                for set_idx in range(len(solution)):
+                    start_row = set_idx * 5
+                    set_rows = edited_df.iloc[start_row:start_row+4]
+                    tire_nums = [int(n) if pd.notna(n) else 0 for n in set_rows['Tire#'].tolist()]
+                    clipboard_text += f"{set_idx + 1}\t{tire_nums[0]}\t{tire_nums[1]}\t{tire_nums[2]}\t{tire_nums[3]}\n"
                 st.code(clipboard_text, language=None)
                 st.info("⬆️ Select and copy the text above to paste into Excel")
         else:
