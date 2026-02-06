@@ -1707,98 +1707,59 @@ with tab_results:
         is_road_results = st.session_state.track_type == 'Road Course'
 
         if is_compact:
-            # --- COMPACT EDITABLE TABLE VIEW (2x2 Grid with blank rows) ---
-            st.subheader("Tire Assignments (Edit to Swap)")
+            # --- COMPACT TABLE VIEW (Simple 2x2 Grid with merged set numbers) ---
+            st.subheader("Tire Sets")
 
-            # Build DataFrame - 4 rows per set + blank row between sets
-            df_rows = []
+            # Build simple HTML table with 2x2 tire grids
+            table_html = '''
+            <style>
+            .grid-table { border-collapse: collapse; width: 100%; font-size: 10px; margin-bottom: 20px; }
+            .grid-table th, .grid-table td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+            .grid-table th { background: #4CAF50; color: white; font-weight: bold; }
+            .grid-table .set-cell { font-weight: bold; background: #e0e0e0; font-size: 12px; }
+            .grid-table tr:nth-child(even) { background: #f9f9f9; }
+            </style>
+            <table class="grid-table">
+            <thead><tr>
+                <th>Set</th>
+                <th>F.Stag</th>
+                <th>R.Stag</th>
+                <th>LF</th>
+                <th>RF</th>
+                <th>LR</th>
+                <th>RR</th>
+                <th>Cross%</th>
+            </tr></thead>
+            <tbody>
+            '''
+
             for set_idx, s in enumerate(solution):
-                corners = [
-                    ('LF', 'lf_data', True, False),   # (corner, data_key, show_fstag, show_rstag)
-                    ('RF', 'rf_data', False, False),
-                    ('LR', 'lr_data', False, True),
-                    ('RR', 'rr_data', False, False),
-                ]
+                lf = s['lf_data']
+                rf = s['rf_data']
+                lr = s['lr_data']
+                rr = s['rr_data']
 
-                for corner, data_key, show_fstag, show_rstag in corners:
-                    tire = s[data_key]
-                    row = {
-                        'Set': set_idx + 1 if corner == 'LF' else '',
-                        'Corner': corner,
-                        'Tire#': int(tire['Number']) if 'Number' in tire.index else 0,
-                        'Rollout': int(tire['Rollout/Dia']),
-                        'Rate': int(tire['Rate']),
-                        'Shift': tire.get('Shift', '') or '-',
-                        'Date': str(tire.get('Date Code', '')).strip() if str(tire.get('Date Code', '')).strip() not in ('', 'nan') else '-',
-                        'F.Stag': round(s.get('front_stagger', 0), 1) if show_fstag else '',
-                        'R.Stag': round(s['stagger'], 1) if show_rstag else '',
-                        'Cross%': round(s['cross'] * 100, 2) if corner == 'RR' else '',
-                    }
-                    df_rows.append(row)
+                def tire_cell(tire):
+                    num = int(tire['Number']) if 'Number' in tire.index else 0
+                    rollout = int(tire['Rollout/Dia'])
+                    rate = int(tire['Rate'])
+                    return f'<b>#{num}</b><br>{rollout}<br>{rate}'
 
-                # Add blank row between sets
-                df_rows.append({
-                    'Set': '', 'Corner': '', 'Tire#': None, 'Rollout': None, 'Rate': None,
-                    'Shift': '', 'Date': '', 'F.Stag': '', 'R.Stag': '', 'Cross%': ''
-                })
+                table_html += f'''
+                <tr>
+                    <td rowspan="1" class="set-cell">{set_idx + 1}</td>
+                    <td>{s.get("front_stagger", 0):.1f}</td>
+                    <td>{s["stagger"]:.1f}</td>
+                    <td>{tire_cell(lf)}</td>
+                    <td>{tire_cell(rf)}</td>
+                    <td>{tire_cell(lr)}</td>
+                    <td>{tire_cell(rr)}</td>
+                    <td>{s["cross"]*100:.2f}</td>
+                </tr>
+                '''
 
-            df = pd.DataFrame(df_rows)
-
-            # Editable columns configuration
-            column_config = {
-                'Set': st.column_config.TextColumn('Set', disabled=True, width='small'),
-                'Corner': st.column_config.TextColumn('Corner', disabled=True, width='small'),
-                'Tire#': st.column_config.NumberColumn('Tire#', width='small'),
-                'Rollout': st.column_config.NumberColumn('Rollout', disabled=True, width='small'),
-                'Rate': st.column_config.NumberColumn('Rate', disabled=True, width='small'),
-                'Shift': st.column_config.TextColumn('Shift', disabled=True, width='small'),
-                'Date': st.column_config.TextColumn('Date', disabled=True, width='small'),
-                'F.Stag': st.column_config.TextColumn('F.Stag', disabled=True, width='small'),
-                'R.Stag': st.column_config.TextColumn('R.Stag', disabled=True, width='small'),
-                'Cross%': st.column_config.TextColumn('Cross%', disabled=True, width='small'),
-            }
-
-            edited_df = st.data_editor(
-                df,
-                column_config=column_config,
-                use_container_width=True,
-                hide_index=True,
-                key='compact_tire_editor'
-            )
-
-            # Validate for duplicates and missing numbers
-            all_nums = [int(n) for n in edited_df['Tire#'].dropna() if n != 0]
-            duplicates = [num for num in set(all_nums) if all_nums.count(num) > 1]
-
-            original_nums = set()
-            for s in solution:
-                for corner in ['lf_data', 'rf_data', 'lr_data', 'rr_data']:
-                    if 'Number' in s[corner].index:
-                        original_nums.add(int(s[corner]['Number']))
-
-            missing = sorted(original_nums - set(all_nums))
-
-            if duplicates or missing:
-                warning_parts = []
-                if duplicates:
-                    warning_parts.append(f"**Duplicates:** {', '.join(f'#{int(n)}' for n in duplicates)}")
-                if missing:
-                    warning_parts.append(f"**Missing:** {', '.join(f'#{int(n)}' for n in missing)}")
-                st.warning(" | ".join(warning_parts))
-            else:
-                st.success("✓ All tire numbers valid")
-
-            # Copy to clipboard button
-            if st.button("📋 Copy Tire Numbers to Clipboard", use_container_width=True):
-                clipboard_text = "Set\tLF\tRF\tLR\tRR\n"
-                # Group by sets (every 5 rows = 1 set + blank)
-                for set_idx in range(len(solution)):
-                    start_row = set_idx * 5
-                    set_rows = edited_df.iloc[start_row:start_row+4]
-                    tire_nums = [int(n) if pd.notna(n) else 0 for n in set_rows['Tire#'].tolist()]
-                    clipboard_text += f"{set_idx + 1}\t{tire_nums[0]}\t{tire_nums[1]}\t{tire_nums[2]}\t{tire_nums[3]}\n"
-                st.code(clipboard_text, language=None)
-                st.info("⬆️ Select and copy the text above to paste into Excel")
+            table_html += '</tbody></table>'
+            st.markdown(table_html, unsafe_allow_html=True)
         else:
             # --- NORMAL CARD VIEW ---
             n_cols = min(len(solution), 5)
