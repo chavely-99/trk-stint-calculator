@@ -118,69 +118,76 @@ button[kind="primary"]:hover {
     border-color: #1b5e20 !important;
 }
 
-/* Compact table view styling */
+/* Compact table view styling - Excel-like */
 .compact-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 10px;
+    font-size: 9px;
     margin-bottom: 15px;
 }
 .compact-table th {
-    background: #2e7d32;
+    background: #4CAF50;
     color: white;
-    padding: 4px 6px;
+    padding: 2px 4px;
     text-align: center;
     font-weight: bold;
-    border: 1px solid #ddd;
-    font-size: 10px;
+    border: 1px solid #ccc;
+    font-size: 9px;
+}
+.compact-table th.sub-header {
+    background: #66BB6A;
+    font-size: 8px;
+    padding: 1px 2px;
 }
 .compact-table td {
-    padding: 1px 2px;
-    border: 1px solid #ddd;
+    padding: 1px 3px;
+    border: 1px solid #ccc;
     text-align: center;
-    font-size: 9px;
+    font-size: 8px;
+    line-height: 1.2;
     vertical-align: middle;
 }
-.compact-table tr:nth-child(even) {
-    background: #f9f9f9;
+.compact-table tbody tr:nth-child(4n+1),
+.compact-table tbody tr:nth-child(4n+2) {
+    background: #fff;
 }
-.compact-table tr:hover {
-    background: #e8f5e9;
+.compact-table tbody tr:nth-child(4n+3),
+.compact-table tbody tr:nth-child(4n+4) {
+    background: #f5f5f5;
 }
 .compact-table .set-col {
     font-weight: bold;
-    background: #f0f0f0;
-    font-size: 11px;
+    background: #e0e0e0;
+    font-size: 9px;
 }
 .compact-table .metric-col {
-    font-weight: bold;
-    font-size: 10px;
+    font-weight: 600;
+    font-size: 8px;
 }
 /* Tire cells - Excel style */
 .compact-table .tire-cell {
     cursor: pointer;
     font-size: 8px;
-    line-height: 1.2;
-    padding: 2px 4px;
+    padding: 1px 3px;
 }
 .compact-table .tire-cell:hover {
-    background: #fffde7;
+    background: #fff9c4 !important;
 }
 .compact-table .tire-cell.selected {
-    background: #c8e6c9;
+    background: #a5d6a7 !important;
     font-weight: bold;
 }
 .compact-table .tire-cell.left {
-    border-left: 3px solid #FF13F0;
+    border-left: 2px solid #FF13F0;
 }
 .compact-table .tire-cell.right {
-    border-left: 3px solid #9E9E9E;
+    border-left: 2px solid #9E9E9E;
 }
 .compact-table .tire-cell.pool-a {
-    border-left: 3px solid #F57C00;
+    border-left: 2px solid #F57C00;
 }
 .compact-table .tire-cell.pool-b {
-    border-left: 3px solid #00897B;
+    border-left: 2px solid #00897B;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -1700,57 +1707,73 @@ with tab_results:
         is_road_results = st.session_state.track_type == 'Road Course'
 
         if is_compact:
-            # --- COMPACT TABLE VIEW (Excel-like) ---
-            # Build HTML table with separate columns for each tire
+            # --- COMPACT TABLE VIEW (Excel-like with 2x2 grids) ---
+            # Each set uses 2 rows: front tires (LF/RF) on row 1, rear tires (LR/RR) on row 2
             table_html = '<table class="compact-table"><thead><tr>'
-            table_html += '<th class="set-col">Set</th>'
-            table_html += '<th class="metric-col">F.Stag</th>'
-            table_html += '<th>LF</th><th>RF</th><th>LR</th><th>RR</th>'
-            table_html += '<th class="metric-col">R.Stag</th>'
-            table_html += '<th class="metric-col">Cross %</th>'
+            table_html += '<th rowspan="2" class="set-col">Set</th>'
+            table_html += '<th colspan="2" class="metric-col">Staggers</th>'
+            table_html += '<th colspan="2">Rollouts</th>'
+            table_html += '<th colspan="2">Rates</th>'
+            table_html += '<th colspan="2">Shifts</th>'
+            table_html += '<th colspan="2">Dates</th>'
+            table_html += '<th rowspan="2" class="metric-col">Cross %</th>'
+            table_html += '</tr><tr>'
+            table_html += '<th class="sub-header">F.Stag</th><th class="sub-header">R.Stag</th>'
+            table_html += '<th class="sub-header">LF</th><th class="sub-header">RF</th>'
+            table_html += '<th class="sub-header">LF</th><th class="sub-header">RF</th>'
+            table_html += '<th class="sub-header">LF</th><th class="sub-header">RF</th>'
+            table_html += '<th class="sub-header">LF</th><th class="sub-header">RF</th>'
             table_html += '</tr></thead><tbody>'
 
             for set_idx, s in enumerate(solution):
-                table_html += '<tr>'
+                # Get tire data
+                lf = s['lf_data']
+                rf = s['rf_data']
+                lr = s['lr_data']
+                rr = s['rr_data']
 
-                # Set number
-                table_html += f'<td class="set-col">{set_idx + 1}</td>'
-
-                # Front stagger
-                table_html += f'<td class="metric-col">{s.get("front_stagger", 0):.1f}</td>'
-
-                # Four tire columns
-                corners = ['LF', 'RF', 'LR', 'RR']
-                tire_keys = ['lf_data', 'rf_data', 'lr_data', 'rr_data']
-
-                for corner, tire_key in zip(corners, tire_keys):
-                    tire = s[tire_key]
+                def get_tire_class(corner):
                     is_sel = selected == (set_idx, corner)
-
-                    # Determine color class
                     if is_road_results:
                         color_class = "pool-a" if corner in ('LR', 'RF') else "pool-b"
                     else:
                         color_class = "left" if corner in ('LF', 'LR') else "right"
+                    return f"tire-cell {color_class}{' selected' if is_sel else ''}"
 
-                    sel_class = " selected" if is_sel else ""
+                def get_shift(tire):
+                    return tire.get('Shift', '') or '-'
 
-                    # Tire data
-                    shift = tire.get('Shift', '') or '-'
+                def get_date(tire):
                     date = tire.get('Date Code', '')
-                    date_str = str(date).strip() if date and str(date).strip() not in ('', 'nan') else '-'
+                    return str(date).strip() if date and str(date).strip() not in ('', 'nan') else '-'
 
-                    # Simple text display - just the essential data
-                    table_html += f'<td class="tire-cell {color_class}{sel_class}" id="tire_{set_idx}_{corner}">'
-                    table_html += f'{tire["Rollout/Dia"]:.0f}<br>{int(tire["Rate"])}<br>{shift}<br>{date_str}'
-                    table_html += '</td>'
+                # ROW 1: Front tires (LF, RF)
+                table_html += '<tr>'
+                table_html += f'<td rowspan="2" class="set-col">{set_idx + 1}</td>'
+                table_html += f'<td class="metric-col">{s.get("front_stagger", 0):.1f}</td>'
+                table_html += f'<td rowspan="2" class="metric-col">{s["stagger"]:.1f}</td>'
+                table_html += f'<td class="{get_tire_class("LF")}" id="tire_{set_idx}_LF">{lf["Rollout/Dia"]:.0f}</td>'
+                table_html += f'<td class="{get_tire_class("RF")}" id="tire_{set_idx}_RF">{rf["Rollout/Dia"]:.0f}</td>'
+                table_html += f'<td class="{get_tire_class("LF")}">{int(lf["Rate"])}</td>'
+                table_html += f'<td class="{get_tire_class("RF")}">{int(rf["Rate"])}</td>'
+                table_html += f'<td class="{get_tire_class("LF")}">{get_shift(lf)}</td>'
+                table_html += f'<td class="{get_tire_class("RF")}">{get_shift(rf)}</td>'
+                table_html += f'<td class="{get_tire_class("LF")}">{get_date(lf)}</td>'
+                table_html += f'<td class="{get_tire_class("RF")}">{get_date(rf)}</td>'
+                table_html += f'<td rowspan="2" class="metric-col">{s["cross"]*100:.2f}</td>'
+                table_html += '</tr>'
 
-                # Rear stagger
-                table_html += f'<td class="metric-col">{s["stagger"]:.1f}</td>'
-
-                # Cross %
-                table_html += f'<td class="metric-col">{s["cross"]*100:.2f}</td>'
-
+                # ROW 2: Rear tires (LR, RR)
+                table_html += '<tr>'
+                table_html += '<td class="metric-col">&nbsp;</td>'  # Empty cell below F.Stag
+                table_html += f'<td class="{get_tire_class("LR")}" id="tire_{set_idx}_LR">{lr["Rollout/Dia"]:.0f}</td>'
+                table_html += f'<td class="{get_tire_class("RR")}" id="tire_{set_idx}_RR">{rr["Rollout/Dia"]:.0f}</td>'
+                table_html += f'<td class="{get_tire_class("LR")}">{int(lr["Rate"])}</td>'
+                table_html += f'<td class="{get_tire_class("RR")}">{int(rr["Rate"])}</td>'
+                table_html += f'<td class="{get_tire_class("LR")}">{get_shift(lr)}</td>'
+                table_html += f'<td class="{get_tire_class("RR")}">{get_shift(rr)}</td>'
+                table_html += f'<td class="{get_tire_class("LR")}">{get_date(lr)}</td>'
+                table_html += f'<td class="{get_tire_class("RR")}">{get_date(rr)}</td>'
                 table_html += '</tr>'
 
             table_html += '</tbody></table>'
