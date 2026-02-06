@@ -1706,216 +1706,86 @@ with tab_results:
         is_compact = st.session_state.compact_view
         is_road_results = st.session_state.track_type == 'Road Course'
 
-        # Handle tire clicks from JavaScript (before rendering)
-        if is_compact and 'tire_click' in st.query_params:
-            tire_click = st.query_params['tire_click']
-            if tire_click.startswith('tire_'):
-                parts = tire_click.split('_')
-                if len(parts) == 3:
-                    clicked_set = int(parts[1])
-                    clicked_corner = parts[2]
-
-                    st.session_state.selected_set = None
-                    if selected is None:
-                        # First selection
-                        st.session_state.selected_tire = (clicked_set, clicked_corner)
-                    elif selected == (clicked_set, clicked_corner):
-                        # Deselect
-                        st.session_state.selected_tire = None
-                    else:
-                        # Attempt swap
-                        from_corner = selected[1]
-                        if is_road_results:
-                            pool_a = {'LR', 'RF'}
-                            same_pool = (from_corner in pool_a) == (clicked_corner in pool_a)
-                        else:
-                            left_pool = {'LF', 'LR'}
-                            same_pool = (from_corner in left_pool) == (clicked_corner in left_pool)
-                        if same_pool:
-                            do_swap(selected[0], selected[1], clicked_set, clicked_corner)
-                        else:
-                            st.session_state.selected_tire = None
-                            st.toast(f"Can't swap {from_corner} with {clicked_corner} — different pools")
-
-            # Clear query param and rerun
-            del st.query_params['tire_click']
-            st.rerun()
-
         if is_compact:
-            # --- COMPACT TABLE VIEW (Excel-like with 2x2 grids) ---
-            # Each set uses 2 rows: front tires (LF/RF) on row 1, rear tires (LR/RR) on row 2
-            table_html = '<table class="compact-table"><thead><tr>'
-            table_html += '<th rowspan="2" class="set-col">Set</th>'
-            table_html += '<th colspan="2" class="metric-col">Staggers</th>'
-            table_html += '<th colspan="2">Rollouts</th>'
-            table_html += '<th colspan="2">Rates</th>'
-            table_html += '<th colspan="2">Shifts</th>'
-            table_html += '<th colspan="2">Dates</th>'
-            table_html += '<th rowspan="2" class="metric-col">Cross %</th>'
-            table_html += '</tr><tr>'
-            table_html += '<th class="sub-header">F.Stag</th><th class="sub-header">R.Stag</th>'
-            table_html += '<th class="sub-header">LF</th><th class="sub-header">RF</th>'
-            table_html += '<th class="sub-header">LF</th><th class="sub-header">RF</th>'
-            table_html += '<th class="sub-header">LF</th><th class="sub-header">RF</th>'
-            table_html += '<th class="sub-header">LF</th><th class="sub-header">RF</th>'
-            table_html += '</tr></thead><tbody>'
+            # --- COMPACT EDITABLE TABLE VIEW ---
+            st.subheader("Tire Assignments (Edit to Swap)")
 
+            # Build DataFrame from solution
+            df_rows = []
             for set_idx, s in enumerate(solution):
-                # Get tire data
-                lf = s['lf_data']
-                rf = s['rf_data']
-                lr = s['lr_data']
-                rr = s['rr_data']
+                row = {
+                    'Set': set_idx + 1,
+                    'F.Stag': round(s.get('front_stagger', 0), 1),
+                    'R.Stag': round(s['stagger'], 1),
+                    'LF#': int(s['lf_data']['Number']) if 'Number' in s['lf_data'].index else 0,
+                    'RF#': int(s['rf_data']['Number']) if 'Number' in s['rf_data'].index else 0,
+                    'LR#': int(s['lr_data']['Number']) if 'Number' in s['lr_data'].index else 0,
+                    'RR#': int(s['rr_data']['Number']) if 'Number' in s['rr_data'].index else 0,
+                    'LF_Roll': int(s['lf_data']['Rollout/Dia']),
+                    'RF_Roll': int(s['rf_data']['Rollout/Dia']),
+                    'LR_Roll': int(s['lr_data']['Rollout/Dia']),
+                    'RR_Roll': int(s['rr_data']['Rollout/Dia']),
+                    'Cross%': round(s['cross'] * 100, 2),
+                }
+                df_rows.append(row)
 
-                def get_tire_class(corner):
-                    is_sel = selected == (set_idx, corner)
-                    if is_road_results:
-                        color_class = "pool-a" if corner in ('LR', 'RF') else "pool-b"
-                    else:
-                        color_class = "left" if corner in ('LF', 'LR') else "right"
-                    return f"tire-cell {color_class}{' selected' if is_sel else ''}"
+            df = pd.DataFrame(df_rows)
 
-                def get_shift(tire):
-                    return tire.get('Shift', '') or '-'
+            # Editable columns configuration
+            column_config = {
+                'Set': st.column_config.NumberColumn('Set', disabled=True, width='small'),
+                'F.Stag': st.column_config.NumberColumn('F.Stag', disabled=True, width='small'),
+                'R.Stag': st.column_config.NumberColumn('R.Stag', disabled=True, width='small'),
+                'LF#': st.column_config.NumberColumn('LF#', width='small'),
+                'RF#': st.column_config.NumberColumn('RF#', width='small'),
+                'LR#': st.column_config.NumberColumn('LR#', width='small'),
+                'RR#': st.column_config.NumberColumn('RR#', width='small'),
+                'LF_Roll': st.column_config.NumberColumn('LF Roll', disabled=True, width='small'),
+                'RF_Roll': st.column_config.NumberColumn('RF Roll', disabled=True, width='small'),
+                'LR_Roll': st.column_config.NumberColumn('LR Roll', disabled=True, width='small'),
+                'RR_Roll': st.column_config.NumberColumn('RR Roll', disabled=True, width='small'),
+                'Cross%': st.column_config.NumberColumn('Cross%', disabled=True, width='small'),
+            }
 
-                def get_date(tire):
-                    date = tire.get('Date Code', '')
-                    return str(date).strip() if date and str(date).strip() not in ('', 'nan') else '-'
+            edited_df = st.data_editor(
+                df,
+                column_config=column_config,
+                use_container_width=True,
+                hide_index=True,
+                key='compact_tire_editor'
+            )
 
-                # ROW 1: Front tires (LF, RF)
-                table_html += '<tr>'
-                table_html += f'<td rowspan="2" class="set-col">{set_idx + 1}</td>'
-                table_html += f'<td class="metric-col">{s.get("front_stagger", 0):.1f}</td>'
-                table_html += f'<td rowspan="2" class="metric-col">{s["stagger"]:.1f}</td>'
-                table_html += f'<td class="{get_tire_class("LF")}" id="tire_{set_idx}_LF">{lf["Rollout/Dia"]:.0f}</td>'
-                table_html += f'<td class="{get_tire_class("RF")}" id="tire_{set_idx}_RF">{rf["Rollout/Dia"]:.0f}</td>'
-                table_html += f'<td class="{get_tire_class("LF")}">{int(lf["Rate"])}</td>'
-                table_html += f'<td class="{get_tire_class("RF")}">{int(rf["Rate"])}</td>'
-                table_html += f'<td class="{get_tire_class("LF")}">{get_shift(lf)}</td>'
-                table_html += f'<td class="{get_tire_class("RF")}">{get_shift(rf)}</td>'
-                table_html += f'<td class="{get_tire_class("LF")}">{get_date(lf)}</td>'
-                table_html += f'<td class="{get_tire_class("RF")}">{get_date(rf)}</td>'
-                table_html += f'<td rowspan="2" class="metric-col">{s["cross"]*100:.2f}</td>'
-                table_html += '</tr>'
+            # Validate for duplicates and missing numbers
+            all_nums = []
+            for col in ['LF#', 'RF#', 'LR#', 'RR#']:
+                all_nums.extend(edited_df[col].tolist())
 
-                # ROW 2: Rear tires (LR, RR)
-                table_html += '<tr>'
-                table_html += '<td class="metric-col">&nbsp;</td>'  # Empty cell below F.Stag
-                table_html += f'<td class="{get_tire_class("LR")}" id="tire_{set_idx}_LR">{lr["Rollout/Dia"]:.0f}</td>'
-                table_html += f'<td class="{get_tire_class("RR")}" id="tire_{set_idx}_RR">{rr["Rollout/Dia"]:.0f}</td>'
-                table_html += f'<td class="{get_tire_class("LR")}">{int(lr["Rate"])}</td>'
-                table_html += f'<td class="{get_tire_class("RR")}">{int(rr["Rate"])}</td>'
-                table_html += f'<td class="{get_tire_class("LR")}">{get_shift(lr)}</td>'
-                table_html += f'<td class="{get_tire_class("RR")}">{get_shift(rr)}</td>'
-                table_html += f'<td class="{get_tire_class("LR")}">{get_date(lr)}</td>'
-                table_html += f'<td class="{get_tire_class("RR")}">{get_date(rr)}</td>'
-                table_html += '</tr>'
+            duplicates = [num for num in set(all_nums) if all_nums.count(num) > 1 and num != 0]
+            original_nums = set()
+            for s in solution:
+                for corner in ['lf_data', 'rf_data', 'lr_data', 'rr_data']:
+                    if 'Number' in s[corner].index:
+                        original_nums.add(int(s[corner]['Number']))
 
-            table_html += '</tbody></table>'
+            missing = sorted(original_nums - set(all_nums))
 
-            # Add JavaScript for clickable tire cells
-            js_code = '''
-            <script>
-            (function() {
-                // Wait a moment for table to render
-                setTimeout(function() {
-                    const tireCells = document.querySelectorAll('.tire-cell');
-                    tireCells.forEach(cell => {
-                        cell.style.cursor = 'pointer';
-                        cell.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            const tireId = this.id;
-                            if (tireId && tireId.startsWith('tire_')) {
-                                // Send selection to Streamlit via query params
-                                const url = new URL(window.parent.location.href);
-                                url.searchParams.set('tire_click', tireId);
-                                window.parent.location.href = url.toString();
-                            }
-                        });
-                    });
-                }, 100);
-            })();
-            </script>
-            '''
+            if duplicates or missing:
+                warning_parts = []
+                if duplicates:
+                    warning_parts.append(f"**Duplicates:** {', '.join(f'#{int(n)}' for n in duplicates)}")
+                if missing:
+                    warning_parts.append(f"**Missing:** {', '.join(f'#{int(n)}' for n in missing)}")
+                st.warning(" | ".join(warning_parts))
+            else:
+                st.success("✓ All tire numbers valid")
 
-            # Render table with JavaScript using components.html()
-            compact_css = '''
-            <style>
-            body { margin: 0; padding: 10px; font-family: sans-serif; }
-            .compact-table {
-                width: 100%;
-                border-collapse: collapse;
-                font-size: 9px;
-                margin-bottom: 15px;
-            }
-            .compact-table th {
-                background: #4CAF50;
-                color: white;
-                padding: 2px 4px;
-                text-align: center;
-                font-weight: bold;
-                border: 1px solid #ccc;
-                font-size: 9px;
-            }
-            .compact-table th.sub-header {
-                background: #66BB6A;
-                font-size: 8px;
-                padding: 1px 2px;
-            }
-            .compact-table td {
-                padding: 1px 3px;
-                border: 1px solid #ccc;
-                text-align: center;
-                font-size: 8px;
-                line-height: 1.2;
-                vertical-align: middle;
-            }
-            .compact-table tbody tr:nth-child(4n+1),
-            .compact-table tbody tr:nth-child(4n+2) {
-                background: #fff;
-            }
-            .compact-table tbody tr:nth-child(4n+3),
-            .compact-table tbody tr:nth-child(4n+4) {
-                background: #f5f5f5;
-            }
-            .compact-table .set-col {
-                font-weight: bold;
-                background: #e0e0e0;
-                font-size: 9px;
-            }
-            .compact-table .metric-col {
-                font-weight: 600;
-                font-size: 8px;
-            }
-            .compact-table .tire-cell {
-                cursor: pointer;
-                font-size: 8px;
-                padding: 1px 3px;
-            }
-            .compact-table .tire-cell:hover {
-                background: #fff9c4 !important;
-            }
-            .compact-table .tire-cell.selected {
-                background: #a5d6a7 !important;
-                font-weight: bold;
-            }
-            .compact-table .tire-cell.left {
-                border-left: 2px solid #FF13F0;
-            }
-            .compact-table .tire-cell.right {
-                border-left: 2px solid #9E9E9E;
-            }
-            .compact-table .tire-cell.pool-a {
-                border-left: 2px solid #F57C00;
-            }
-            .compact-table .tire-cell.pool-b {
-                border-left: 2px solid #00897B;
-            }
-            </style>
-            '''
-
-            full_html = f'{compact_css}{table_html}{js_code}'
-            components.html(full_html, height=600, scrolling=True)
+            # Copy to clipboard button
+            if st.button("📋 Copy Tire Numbers to Clipboard", use_container_width=True):
+                clipboard_text = "Set\tLF\tRF\tLR\tRR\n"
+                for _, row in edited_df.iterrows():
+                    clipboard_text += f"{int(row['Set'])}\t{int(row['LF#'])}\t{int(row['RF#'])}\t{int(row['LR#'])}\t{int(row['RR#'])}\n"
+                st.code(clipboard_text, language=None)
+                st.info("⬆️ Select and copy the text above to paste into Excel")
         else:
             # --- NORMAL CARD VIEW ---
             n_cols = min(len(solution), 5)
