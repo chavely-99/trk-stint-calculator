@@ -1711,27 +1711,26 @@ with tab_results:
             st.subheader("Tire Sets")
 
             # Build simple HTML table with 2x2 tire grids
-            table_html = '''
-            <style>
-            .grid-table { border-collapse: collapse; width: 100%; font-size: 10px; margin-bottom: 20px; }
-            .grid-table th, .grid-table td { border: 1px solid #ccc; padding: 6px; text-align: center; }
-            .grid-table th { background: #4CAF50; color: white; font-weight: bold; }
-            .grid-table .set-cell { font-weight: bold; background: #e0e0e0; font-size: 12px; }
-            .grid-table tr:nth-child(even) { background: #f9f9f9; }
-            </style>
-            <table class="grid-table">
-            <thead><tr>
-                <th>Set</th>
-                <th>F.Stag</th>
-                <th>R.Stag</th>
-                <th>LF</th>
-                <th>RF</th>
-                <th>LR</th>
-                <th>RR</th>
-                <th>Cross%</th>
-            </tr></thead>
-            <tbody>
-            '''
+            table_html = """<style>
+.grid-table { border-collapse: collapse; width: 100%; font-size: 10px; margin-bottom: 20px; }
+.grid-table th, .grid-table td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+.grid-table th { background: #4CAF50; color: white; font-weight: bold; }
+.grid-table .set-cell { font-weight: bold; background: #e0e0e0; font-size: 12px; }
+.grid-table tr:nth-child(even) { background: #f9f9f9; }
+</style>
+<table class="grid-table">
+<thead><tr>
+<th>Set</th>
+<th>F.Stag</th>
+<th>R.Stag</th>
+<th>LF</th>
+<th>RF</th>
+<th>LR</th>
+<th>RR</th>
+<th>Cross%</th>
+</tr></thead>
+<tbody>
+"""
 
             for set_idx, s in enumerate(solution):
                 lf = s['lf_data']
@@ -1745,18 +1744,17 @@ with tab_results:
                     rate = int(tire['Rate'])
                     return f'<b>#{num}</b><br>{rollout}<br>{rate}'
 
-                table_html += f'''
-                <tr>
-                    <td rowspan="1" class="set-cell">{set_idx + 1}</td>
-                    <td>{s.get("front_stagger", 0):.1f}</td>
-                    <td>{s["stagger"]:.1f}</td>
-                    <td>{tire_cell(lf)}</td>
-                    <td>{tire_cell(rf)}</td>
-                    <td>{tire_cell(lr)}</td>
-                    <td>{tire_cell(rr)}</td>
-                    <td>{s["cross"]*100:.2f}</td>
-                </tr>
-                '''
+                table_html += f"""<tr>
+<td class="set-cell">{set_idx + 1}</td>
+<td>{s.get("front_stagger", 0):.1f}</td>
+<td>{s["stagger"]:.1f}</td>
+<td>{tire_cell(lf)}</td>
+<td>{tire_cell(rf)}</td>
+<td>{tire_cell(lr)}</td>
+<td>{tire_cell(rr)}</td>
+<td>{s["cross"]*100:.2f}</td>
+</tr>
+"""
 
             table_html += '</tbody></table>'
             st.markdown(table_html, unsafe_allow_html=True)
