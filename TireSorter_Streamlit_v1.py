@@ -1810,6 +1810,20 @@ with tab_results:
 
             # Detect changes and perform swaps
             if edited_df is not None:
+                # Get tire pools from session state
+                left_pool = st.session_state.get('left_tires', pd.DataFrame())
+                right_pool = st.session_state.get('right_tires', pd.DataFrame())
+
+                # For road course, split into A and non-A pools
+                if is_road_results and not left_pool.empty:
+                    left_a = left_pool[left_pool['D-Code'].str.endswith('A', na=False)]
+                    left_non_a = left_pool[~left_pool['D-Code'].str.endswith('A', na=False)]
+                    right_a = right_pool[right_pool['D-Code'].str.endswith('A', na=False)]
+                    right_non_a = right_pool[~right_pool['D-Code'].str.endswith('A', na=False)]
+                else:
+                    left_a = left_non_a = left_pool
+                    right_a = right_non_a = right_pool
+
                 changes_detected = False
                 for row_idx in range(len(df)):
                     meta = row_metadata[row_idx]
@@ -1826,9 +1840,9 @@ with tab_results:
                         if is_road_results:
                             pool = left_a if solution[set_idx][f'{corner}_data']['D-Code'].endswith('A') else left_non_a
                         else:
-                            pool = left_tires
+                            pool = left_pool
 
-                        for tire in pool:
+                        for _, tire in pool.iterrows():
                             if 'Number' in tire.index and int(tire['Number']) == int(new_ls):
                                 target_tire = tire
                                 break
@@ -1847,9 +1861,9 @@ with tab_results:
                         if is_road_results:
                             pool = right_a if solution[set_idx][f'{corner}_data']['D-Code'].endswith('A') else right_non_a
                         else:
-                            pool = right_tires
+                            pool = right_pool
 
-                        for tire in pool:
+                        for _, tire in pool.iterrows():
                             if 'Number' in tire.index and int(tire['Number']) == int(new_rs):
                                 target_tire = tire
                                 break
@@ -1869,7 +1883,7 @@ with tab_results:
                         )
                         solution[set_idx].update(metrics)
 
-                    st.session_state.solution = solution
+                    st.session_state.results = solution
                     st.rerun()
         else:
             # --- NORMAL CARD VIEW ---
