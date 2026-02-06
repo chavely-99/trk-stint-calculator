@@ -1827,7 +1827,6 @@ with tab_results:
                 df,
                 use_container_width=True,
                 hide_index=True,
-                height=None,  # Full length, no scrolling
                 column_config={
                     'Set': st.column_config.TextColumn('Set #', width='small', disabled=True),
                     'LS ID': st.column_config.TextColumn('LS ID', width='medium'),
