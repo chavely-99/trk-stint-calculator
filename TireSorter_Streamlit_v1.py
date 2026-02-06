@@ -135,7 +135,7 @@ button[kind="primary"]:hover {
     font-size: 10px;
 }
 .compact-table td {
-    padding: 2px 4px;
+    padding: 1px 2px;
     border: 1px solid #ddd;
     text-align: center;
     font-size: 9px;
@@ -157,7 +157,7 @@ button[kind="primary"]:hover {
     font-size: 10px;
 }
 .compact-table .tire-grid-cell {
-    padding: 2px;
+    padding: 1px;
 }
 
 /* 2x2 tire grid within table cell */
@@ -165,19 +165,19 @@ button[kind="primary"]:hover {
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
-    gap: 1px;
+    gap: 0;
     width: 100%;
-    max-width: 250px;
+    max-width: 220px;
     margin: 0 auto;
 }
 .compact-tire {
     background: transparent;
     border: none;
     border-left: 2px solid transparent;
-    padding: 2px 4px;
+    padding: 1px 2px;
     cursor: pointer;
-    font-size: 9px;
-    line-height: 1.3;
+    font-size: 8px;
+    line-height: 1.1;
     text-align: center;
 }
 .compact-tire:hover {
@@ -200,26 +200,31 @@ button[kind="primary"]:hover {
 }
 .compact-tire .tire-corner {
     font-weight: bold;
-    font-size: 8px;
+    font-size: 7px;
     color: #666;
+    margin: 0;
 }
 .compact-tire .tire-rollout {
     font-weight: bold;
-    font-size: 11px;
+    font-size: 10px;
     color: #000;
+    margin: 0;
 }
 .compact-tire .tire-rate {
     font-weight: 600;
-    font-size: 10px;
+    font-size: 9px;
     color: #333;
+    margin: 0;
 }
 .compact-tire .tire-shift {
-    font-size: 8px;
+    font-size: 7px;
     color: #666;
+    margin: 0;
 }
 .compact-tire .tire-date {
-    font-size: 7px;
+    font-size: 6px;
     color: #999;
+    margin: 0;
 }
 </style>
 """, unsafe_allow_html=True)
