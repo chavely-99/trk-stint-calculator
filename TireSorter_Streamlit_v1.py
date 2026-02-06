@@ -1710,31 +1710,14 @@ with tab_results:
             # --- COMPACT TABLE VIEW (11 columns, 2 rows per set) ---
             st.subheader("Tire Sets")
 
-            # Build simple table: 11 columns, 2 rows per set
-            table_html = """<style>
-.compact-table { border-collapse: collapse; width: 100%; font-size: 10px; }
-.compact-table th, .compact-table td { border: 1px solid #ccc; padding: 4px; text-align: center; }
-.compact-table th { background: #4CAF50; color: white; font-weight: bold; position: sticky; top: 0; }
-.compact-table .set-cell { font-weight: bold; background: #e0e0e0; }
-.compact-table .id-cell { background: #f0f0f0; font-weight: bold; font-size: 9px; }
-</style>
-<table class="compact-table">
-<thead><tr>
-<th>Set #</th>
-<th>ID Number</th>
-<th>Rollout</th>
-<th>Rollout</th>
-<th>Spring Rate</th>
-<th>Spring Rate</th>
-<th>Date Code</th>
-<th>Date Code</th>
-<th>Shift Code</th>
-<th>Shift Code</th>
-<th>Cross %</th>
-<th>Stagger</th>
-</tr></thead>
-<tbody>
-"""
+            # Helper to get tire data safely
+            def get_val(tire, field, default='-'):
+                val = tire.get(field, default) if field in tire.index else default
+                return str(val) if val and str(val) not in ['nan', 'None', ''] else '-'
+
+            # Build DataFrame for editable table
+            table_rows = []
+            row_metadata = []  # Track set_idx and position (front/rear) for each row
 
             for set_idx, s in enumerate(solution):
                 lf = s['lf_data']
@@ -1742,49 +1725,134 @@ with tab_results:
                 lr = s['lr_data']
                 rr = s['rr_data']
 
-                # Helper to get tire data safely
-                def get_val(tire, field, default='-'):
-                    val = tire.get(field, default) if field in tire.index else default
-                    return str(val) if val and str(val) not in ['nan', 'None', ''] else '-'
+                # Front row
+                lf_num = int(lf['Number']) if 'Number' in lf.index else 0
+                rf_num = int(rf['Number']) if 'Number' in rf.index else 0
+                table_rows.append({
+                    'Set': set_idx + 1,
+                    'LF ID': lf_num,
+                    'RF ID': rf_num,
+                    'LF Roll': int(lf['Rollout/Dia']),
+                    'RF Roll': int(rf['Rollout/Dia']),
+                    'LF Rate': int(lf['Rate']),
+                    'RF Rate': int(rf['Rate']),
+                    'LF Date': get_val(lf, 'Date Code'),
+                    'RF Date': get_val(rf, 'Date Code'),
+                    'LF Shift': get_val(lf, 'Shift'),
+                    'RF Shift': get_val(rf, 'Shift'),
+                    'Cross%': f"{s['cross']*100:.2f}",
+                    'Stagger': f"{s.get('front_stagger', 0):.1f}"
+                })
+                row_metadata.append({'set_idx': set_idx, 'position': 'front'})
 
-                # Front row (LF/RF)
-                lf_num = int(lf['Number']) if 'Number' in lf.index else '-'
-                rf_num = int(rf['Number']) if 'Number' in rf.index else '-'
-                table_html += f"""<tr>
-<td rowspan="2" class="set-cell">{set_idx + 1}</td>
-<td class="id-cell">{lf_num}, {rf_num}</td>
-<td>{int(lf['Rollout/Dia'])}</td>
-<td>{int(rf['Rollout/Dia'])}</td>
-<td>{int(lf['Rate'])}</td>
-<td>{int(rf['Rate'])}</td>
-<td>{get_val(lf, 'Date Code')}</td>
-<td>{get_val(rf, 'Date Code')}</td>
-<td>{get_val(lf, 'Shift')}</td>
-<td>{get_val(rf, 'Shift')}</td>
-<td rowspan="2">{s['cross']*100:.2f}</td>
-<td>{s.get('front_stagger', 0):.1f}</td>
-</tr>
-"""
+                # Rear row
+                lr_num = int(lr['Number']) if 'Number' in lr.index else 0
+                rr_num = int(rr['Number']) if 'Number' in rr.index else 0
+                table_rows.append({
+                    'Set': '',  # Empty for merged appearance
+                    'LF ID': lr_num,
+                    'RF ID': rr_num,
+                    'LF Roll': int(lr['Rollout/Dia']),
+                    'RF Roll': int(rr['Rollout/Dia']),
+                    'LF Rate': int(lr['Rate']),
+                    'RF Rate': int(rr['Rate']),
+                    'LF Date': get_val(lr, 'Date Code'),
+                    'RF Date': get_val(rr, 'Date Code'),
+                    'LF Shift': get_val(lr, 'Shift'),
+                    'RF Shift': get_val(rr, 'Shift'),
+                    'Cross%': '',  # Empty for merged appearance
+                    'Stagger': f"{s['stagger']:.1f}"
+                })
+                row_metadata.append({'set_idx': set_idx, 'position': 'rear'})
 
-                # Rear row (LR/RR)
-                lr_num = int(lr['Number']) if 'Number' in lr.index else '-'
-                rr_num = int(rr['Number']) if 'Number' in rr.index else '-'
-                table_html += f"""<tr>
-<td class="id-cell">{lr_num}, {rr_num}</td>
-<td>{int(lr['Rollout/Dia'])}</td>
-<td>{int(rr['Rollout/Dia'])}</td>
-<td>{int(lr['Rate'])}</td>
-<td>{int(rr['Rate'])}</td>
-<td>{get_val(lr, 'Date Code')}</td>
-<td>{get_val(rr, 'Date Code')}</td>
-<td>{get_val(lr, 'Shift')}</td>
-<td>{get_val(rr, 'Shift')}</td>
-<td>{s['stagger']:.1f}</td>
-</tr>
-"""
+            df = pd.DataFrame(table_rows)
 
-            table_html += '</tbody></table>'
-            st.markdown(table_html, unsafe_allow_html=True)
+            # Display editable table
+            edited_df = st.data_editor(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    'Set': st.column_config.TextColumn('Set #', width='small', disabled=True),
+                    'LF ID': st.column_config.NumberColumn('LF ID', width='small', min_value=0, max_value=9999),
+                    'RF ID': st.column_config.NumberColumn('RF ID', width='small', min_value=0, max_value=9999),
+                    'LF Roll': st.column_config.NumberColumn('LF Roll', width='small', disabled=True),
+                    'RF Roll': st.column_config.NumberColumn('RF Roll', width='small', disabled=True),
+                    'LF Rate': st.column_config.NumberColumn('LF Rate', width='small', disabled=True),
+                    'RF Rate': st.column_config.NumberColumn('RF Rate', width='small', disabled=True),
+                    'LF Date': st.column_config.TextColumn('LF Date', width='small', disabled=True),
+                    'RF Date': st.column_config.TextColumn('RF Date', width='small', disabled=True),
+                    'LF Shift': st.column_config.TextColumn('LF Shift', width='small', disabled=True),
+                    'RF Shift': st.column_config.TextColumn('RF Shift', width='small', disabled=True),
+                    'Cross%': st.column_config.TextColumn('Cross%', width='small', disabled=True),
+                    'Stagger': st.column_config.TextColumn('Stagger', width='small', disabled=True),
+                },
+                key='compact_table_editor'
+            )
+
+            # Detect changes and perform swaps
+            if edited_df is not None:
+                changes_detected = False
+                for row_idx in range(len(df)):
+                    meta = row_metadata[row_idx]
+                    set_idx = meta['set_idx']
+                    is_front = meta['position'] == 'front'
+
+                    # Check LF ID change
+                    old_lf = df.at[row_idx, 'LF ID']
+                    new_lf = edited_df.at[row_idx, 'LF ID']
+                    if old_lf != new_lf and new_lf > 0:
+                        corner = 'lf' if is_front else 'lr'
+                        # Find tire with new ID in available pool
+                        target_tire = None
+                        if is_road_results:
+                            pool = left_a if solution[set_idx][f'{corner}_data']['D-Code'].endswith('A') else left_non_a
+                        else:
+                            pool = left_tires
+
+                        for tire in pool:
+                            if 'Number' in tire.index and int(tire['Number']) == int(new_lf):
+                                target_tire = tire
+                                break
+
+                        if target_tire is not None:
+                            solution[set_idx][f'{corner}_data'] = target_tire
+                            changes_detected = True
+
+                    # Check RF ID change
+                    old_rf = df.at[row_idx, 'RF ID']
+                    new_rf = edited_df.at[row_idx, 'RF ID']
+                    if old_rf != new_rf and new_rf > 0:
+                        corner = 'rf' if is_front else 'rr'
+                        # Find tire with new ID in available pool
+                        target_tire = None
+                        if is_road_results:
+                            pool = right_a if solution[set_idx][f'{corner}_data']['D-Code'].endswith('A') else right_non_a
+                        else:
+                            pool = right_tires
+
+                        for tire in pool:
+                            if 'Number' in tire.index and int(tire['Number']) == int(new_rf):
+                                target_tire = tire
+                                break
+
+                        if target_tire is not None:
+                            solution[set_idx][f'{corner}_data'] = target_tire
+                            changes_detected = True
+
+                if changes_detected:
+                    # Recalculate metrics for affected sets
+                    for set_idx in range(len(solution)):
+                        metrics = compute_set_metrics(
+                            solution[set_idx]['lf_data'],
+                            solution[set_idx]['rf_data'],
+                            solution[set_idx]['lr_data'],
+                            solution[set_idx]['rr_data']
+                        )
+                        solution[set_idx].update(metrics)
+
+                    st.session_state.solution = solution
+                    st.rerun()
         else:
             # --- NORMAL CARD VIEW ---
             n_cols = min(len(solution), 5)
