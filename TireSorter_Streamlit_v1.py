@@ -1706,6 +1706,41 @@ with tab_results:
         is_compact = st.session_state.compact_view
         is_road_results = st.session_state.track_type == 'Road Course'
 
+        # Handle tire clicks from JavaScript (before rendering)
+        if is_compact and 'tire_click' in st.query_params:
+            tire_click = st.query_params['tire_click']
+            if tire_click.startswith('tire_'):
+                parts = tire_click.split('_')
+                if len(parts) == 3:
+                    clicked_set = int(parts[1])
+                    clicked_corner = parts[2]
+
+                    st.session_state.selected_set = None
+                    if selected is None:
+                        # First selection
+                        st.session_state.selected_tire = (clicked_set, clicked_corner)
+                    elif selected == (clicked_set, clicked_corner):
+                        # Deselect
+                        st.session_state.selected_tire = None
+                    else:
+                        # Attempt swap
+                        from_corner = selected[1]
+                        if is_road_results:
+                            pool_a = {'LR', 'RF'}
+                            same_pool = (from_corner in pool_a) == (clicked_corner in pool_a)
+                        else:
+                            left_pool = {'LF', 'LR'}
+                            same_pool = (from_corner in left_pool) == (clicked_corner in left_pool)
+                        if same_pool:
+                            do_swap(selected[0], selected[1], clicked_set, clicked_corner)
+                        else:
+                            st.session_state.selected_tire = None
+                            st.toast(f"Can't swap {from_corner} with {clicked_corner} — different pools")
+
+            # Clear query param and rerun
+            del st.query_params['tire_click']
+            st.rerun()
+
         if is_compact:
             # --- COMPACT TABLE VIEW (Excel-like with 2x2 grids) ---
             # Each set uses 2 rows: front tires (LF/RF) on row 1, rear tires (LR/RR) on row 2
@@ -1781,61 +1816,38 @@ with tab_results:
             # Add JavaScript for clickable tire cells
             js_code = '''
             <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                const tireCells = document.querySelectorAll('.tire-cell');
-                tireCells.forEach(cell => {
-                    cell.style.cursor = 'pointer';
-                    cell.addEventListener('click', function() {
-                        const tireId = this.id;
-                        if (tireId && tireId.startsWith('tire_')) {
-                            // Send selection to Streamlit via query params
-                            const url = new URL(window.location.href);
-                            url.searchParams.set('tire_click', tireId);
-                            window.location.href = url.toString();
-                        }
+            (function() {
+                // Wait a moment for table to render
+                setTimeout(function() {
+                    const tireCells = document.querySelectorAll('.tire-cell');
+                    tireCells.forEach(cell => {
+                        cell.style.cursor = 'pointer';
+                        cell.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            const tireId = this.id;
+                            if (tireId && tireId.startsWith('tire_')) {
+                                // Send selection to Streamlit via query params
+                                const url = new URL(window.parent.location.href);
+                                url.searchParams.set('tire_click', tireId);
+                                window.parent.location.href = url.toString();
+                            }
+                        });
                     });
-                });
-            });
+                }, 100);
+            })();
             </script>
             '''
-            table_html += js_code
 
-            st.markdown(table_html, unsafe_allow_html=True)
+            # Render table with JavaScript using components.html()
+            full_html = f'''
+            <style>
+            {st.get_option("theme.base") or ""}
+            </style>
+            {table_html}
+            {js_code}
+            '''
 
-            # Handle tire clicks from JavaScript
-            if 'tire_click' in st.query_params:
-                tire_click = st.query_params['tire_click']
-                if tire_click.startswith('tire_'):
-                    parts = tire_click.split('_')
-                    if len(parts) == 3:
-                        clicked_set = int(parts[1])
-                        clicked_corner = parts[2]
-
-                        st.session_state.selected_set = None
-                        if selected is None:
-                            # First selection
-                            st.session_state.selected_tire = (clicked_set, clicked_corner)
-                        elif selected == (clicked_set, clicked_corner):
-                            # Deselect
-                            st.session_state.selected_tire = None
-                        else:
-                            # Attempt swap
-                            from_corner = selected[1]
-                            if is_road_results:
-                                pool_a = {'LR', 'RF'}
-                                same_pool = (from_corner in pool_a) == (clicked_corner in pool_a)
-                            else:
-                                left_pool = {'LF', 'LR'}
-                                same_pool = (from_corner in left_pool) == (clicked_corner in left_pool)
-                            if same_pool:
-                                do_swap(selected[0], selected[1], clicked_set, clicked_corner)
-                            else:
-                                st.session_state.selected_tire = None
-                                st.toast(f"Can't swap {from_corner} with {clicked_corner} — different pools")
-
-                # Clear query param and rerun
-                del st.query_params['tire_click']
-                st.rerun()
+            components.html(full_html, height=600, scrolling=True)
         else:
             # --- NORMAL CARD VIEW ---
             n_cols = min(len(solution), 5)
