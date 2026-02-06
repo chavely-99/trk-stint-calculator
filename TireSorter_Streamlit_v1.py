@@ -118,80 +118,77 @@ button[kind="primary"]:hover {
     border-color: #1b5e20 !important;
 }
 
-/* Compact table view styling for 10+ sets */
-.compact-set-container {
-    border: 2px solid #999;
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 16px;
-    background: #fafafa;
-}
-.compact-set-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid #ddd;
-}
-.compact-set-title {
-    font-weight: bold;
-    font-size: 16px;
-    color: #333;
-}
-.compact-set-metrics {
-    display: flex;
-    gap: 20px;
-    font-size: 13px;
-    color: #555;
-}
-.compact-set-metrics b {
-    color: #222;
-}
-.compact-tires-row {
-    display: flex;
-    gap: 8px;
-    margin: 8px 0;
-}
-.tire-box.compact-table {
-    flex: 1;
-    padding: 6px 8px;
+/* Compact table view styling */
+.compact-table {
+    width: 100%;
+    border-collapse: collapse;
     font-size: 11px;
-    min-height: auto;
+    margin-bottom: 20px;
+}
+.compact-table th {
+    background: #2e7d32;
+    color: white;
+    padding: 6px 8px;
+    text-align: center;
+    font-weight: bold;
+    border: 1px solid #ddd;
+    font-size: 11px;
+}
+.compact-table td {
+    padding: 4px 6px;
+    border: 1px solid #ddd;
+    text-align: center;
+    font-size: 10px;
+}
+.compact-table tr:nth-child(even) {
+    background: #f9f9f9;
+}
+.compact-table tr:hover {
+    background: #e8f5e9;
+}
+.compact-table .set-col {
+    font-weight: bold;
+    background: #f0f0f0;
+}
+.compact-table .tire-cell {
     cursor: pointer;
+    padding: 6px 8px;
 }
-.tire-box.compact-table .tire-corner {
-    font-size: 12px;
+.compact-table .tire-cell:hover {
+    background: #fff9c4;
+}
+.compact-table .tire-cell.selected {
+    background: #c8e6c9;
+    border: 2px solid #2e7d32;
+}
+.compact-table .tire-cell.left {
+    border-left: 3px solid #FF13F0;
+}
+.compact-table .tire-cell.right {
+    border-left: 3px solid #9E9E9E;
+}
+.compact-table .tire-cell.pool-a {
+    border-left: 3px solid #F57C00;
+}
+.compact-table .tire-cell.pool-b {
+    border-left: 3px solid #00897B;
+}
+.compact-table .tire-corner {
     font-weight: bold;
-    margin-bottom: 3px;
-}
-.tire-box.compact-table .tire-label {
-    display: inline-block;
-    width: 32px;
     font-size: 10px;
+    color: #666;
 }
-.tire-box.compact-table .tire-rollout {
-    font-size: 13px;
+.compact-table .tire-values {
+    font-size: 11px;
+    line-height: 1.3;
+}
+.compact-table .tire-rollout {
     font-weight: bold;
+    color: #000;
 }
-.tire-box.compact-table .tire-rate {
-    font-size: 12px;
-}
-.tire-box.compact-table .tire-shift,
-.tire-box.compact-table .tire-date {
-    font-size: 10px;
-}
-.compact-set-footer {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 8px;
-    padding-top: 6px;
-    border-top: 1px solid #ddd;
-    font-size: 12px;
-    color: #555;
-}
-.compact-set-footer b {
-    color: #222;
+.compact-table .metric-col {
+    font-weight: bold;
+    font-size: 11px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -1712,66 +1709,97 @@ with tab_results:
 
         if is_compact:
             # --- COMPACT TABLE VIEW ---
+            # Build HTML table
+            table_html = '<table class="compact-table"><thead><tr>'
+            table_html += '<th class="set-col">Set</th>'
+            table_html += '<th class="metric-col">F.Stag</th>'
+            table_html += '<th>LF</th><th>RF</th><th>LR</th><th>RR</th>'
+            table_html += '<th class="metric-col">R.Stag</th>'
+            table_html += '<th class="metric-col">Cross %</th>'
+            table_html += '</tr></thead><tbody>'
+
             for set_idx, s in enumerate(solution):
-                with st.container():
-                    # Header with Set #, Front Stagger, Cross
-                    st.markdown(
-                        f'<div class="compact-set-container">'
-                        f'<div class="compact-set-header">'
-                        f'<div class="compact-set-title">Set {set_idx + 1}</div>'
-                        f'<div class="compact-set-metrics">'
-                        f'<span><b>F.Stag:</b> {s.get("front_stagger", 0):.1f}</span>'
-                        f'<span><b>Cross:</b> {s["cross"]*100:.2f}%</span>'
-                        f'</div>'
-                        f'</div>',
-                        unsafe_allow_html=True
-                    )
+                table_html += '<tr>'
 
-                    # Horizontal row of 4 tires
-                    tire_cols = st.columns(4)
-                    corners = ['LF', 'RF', 'LR', 'RR']
-                    tire_keys = ['lf_data', 'rf_data', 'lr_data', 'rr_data']
+                # Set number
+                table_html += f'<td class="set-col">{set_idx + 1}</td>'
 
-                    for col, corner, tire_key in zip(tire_cols, corners, tire_keys):
-                        with col:
-                            is_sel = selected == (set_idx, corner)
-                            st.markdown(
-                                render_tire_html(s[tire_key], corner, highlight=is_sel,
-                                               road_course=is_road_results, compact=True),
-                                unsafe_allow_html=True
-                            )
-                            btn_type = "primary" if is_sel else "secondary"
-                            if st.button(corner, key=f"tire_{set_idx}_{corner}",
-                                       use_container_width=True, type=btn_type):
-                                st.session_state.selected_set = None
-                                if selected is None:
-                                    st.session_state.selected_tire = (set_idx, corner)
-                                elif is_sel:
-                                    st.session_state.selected_tire = None
+                # Front stagger
+                table_html += f'<td class="metric-col">{s.get("front_stagger", 0):.1f}</td>'
+
+                # Four tires
+                corners = ['LF', 'RF', 'LR', 'RR']
+                tire_keys = ['lf_data', 'rf_data', 'lr_data', 'rr_data']
+
+                for corner, tire_key in zip(corners, tire_keys):
+                    tire = s[tire_key]
+                    is_sel = selected == (set_idx, corner)
+
+                    # Determine color class
+                    if is_road_results:
+                        color_class = "pool-a" if corner in ('LR', 'RF') else "pool-b"
+                    else:
+                        color_class = "left" if corner in ('LF', 'LR') else "right"
+
+                    sel_class = " selected" if is_sel else ""
+
+                    # Tire cell content
+                    shift = tire.get('Shift', '') or '-'
+                    date = tire.get('Date Code', '')
+                    date_str = str(date).strip() if date and str(date).strip() not in ('', 'nan') else '-'
+
+                    table_html += f'<td class="tire-cell {color_class}{sel_class}" id="tire_{set_idx}_{corner}">'
+                    table_html += f'<div class="tire-corner">{corner}</div>'
+                    table_html += f'<div class="tire-values">'
+                    table_html += f'<div class="tire-rollout">{tire["Rollout/Dia"]:.0f}</div>'
+                    table_html += f'<div class="tire-rate">{int(tire["Rate"])}</div>'
+                    table_html += f'<div>{shift}</div>'
+                    table_html += f'<div>{date_str}</div>'
+                    table_html += f'</div></td>'
+
+                # Rear stagger
+                table_html += f'<td class="metric-col">{s["stagger"]:.1f}</td>'
+
+                # Cross %
+                table_html += f'<td class="metric-col">{s["cross"]*100:.2f}</td>'
+
+                table_html += '</tr>'
+
+            table_html += '</tbody></table>'
+
+            st.markdown(table_html, unsafe_allow_html=True)
+
+            # Add tire selection buttons in columns below table
+            st.caption("Click tire to select for swapping:")
+            btn_cols = st.columns(len(solution))
+            for set_idx, s in enumerate(solution):
+                with btn_cols[set_idx % len(btn_cols)]:
+                    st.caption(f"Set {set_idx + 1}")
+                    for corner in ['LF', 'RF', 'LR', 'RR']:
+                        is_sel = selected == (set_idx, corner)
+                        btn_type = "primary" if is_sel else "secondary"
+                        if st.button(corner, key=f"tire_{set_idx}_{corner}",
+                                   use_container_width=True, type=btn_type):
+                            st.session_state.selected_set = None
+                            if selected is None:
+                                st.session_state.selected_tire = (set_idx, corner)
+                            elif is_sel:
+                                st.session_state.selected_tire = None
+                            else:
+                                # Enforce pool constraints
+                                from_corner = selected[1]
+                                if is_road_results:
+                                    pool_a = {'LR', 'RF'}
+                                    same_pool = (from_corner in pool_a) == (corner in pool_a)
                                 else:
-                                    # Enforce pool constraints
-                                    from_corner = selected[1]
-                                    if is_road_results:
-                                        pool_a = {'LR', 'RF'}
-                                        same_pool = (from_corner in pool_a) == (corner in pool_a)
-                                    else:
-                                        left_pool = {'LF', 'LR'}
-                                        same_pool = (from_corner in left_pool) == (corner in left_pool)
-                                    if same_pool:
-                                        do_swap(selected[0], selected[1], set_idx, corner)
-                                    else:
-                                        st.session_state.selected_tire = None
-                                        st.toast(f"Can't swap {from_corner} with {corner} — different pools")
-                                st.rerun()
-
-                    # Footer with Rear Stagger
-                    st.markdown(
-                        f'<div class="compact-set-footer">'
-                        f'<span><b>R.Stag:</b> {s["stagger"]:.1f}</span>'
-                        f'</div>'
-                        f'</div>',
-                        unsafe_allow_html=True
-                    )
+                                    left_pool = {'LF', 'LR'}
+                                    same_pool = (from_corner in left_pool) == (corner in left_pool)
+                                if same_pool:
+                                    do_swap(selected[0], selected[1], set_idx, corner)
+                                else:
+                                    st.session_state.selected_tire = None
+                                    st.toast(f"Can't swap {from_corner} with {corner} — different pools")
+                            st.rerun()
         else:
             # --- NORMAL CARD VIEW ---
             n_cols = min(len(solution), 5)
