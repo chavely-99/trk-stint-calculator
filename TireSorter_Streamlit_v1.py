@@ -1839,14 +1839,82 @@ with tab_results:
             '''
 
             # Render table with JavaScript using components.html()
-            full_html = f'''
+            compact_css = '''
             <style>
-            {st.get_option("theme.base") or ""}
+            body { margin: 0; padding: 10px; font-family: sans-serif; }
+            .compact-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 9px;
+                margin-bottom: 15px;
+            }
+            .compact-table th {
+                background: #4CAF50;
+                color: white;
+                padding: 2px 4px;
+                text-align: center;
+                font-weight: bold;
+                border: 1px solid #ccc;
+                font-size: 9px;
+            }
+            .compact-table th.sub-header {
+                background: #66BB6A;
+                font-size: 8px;
+                padding: 1px 2px;
+            }
+            .compact-table td {
+                padding: 1px 3px;
+                border: 1px solid #ccc;
+                text-align: center;
+                font-size: 8px;
+                line-height: 1.2;
+                vertical-align: middle;
+            }
+            .compact-table tbody tr:nth-child(4n+1),
+            .compact-table tbody tr:nth-child(4n+2) {
+                background: #fff;
+            }
+            .compact-table tbody tr:nth-child(4n+3),
+            .compact-table tbody tr:nth-child(4n+4) {
+                background: #f5f5f5;
+            }
+            .compact-table .set-col {
+                font-weight: bold;
+                background: #e0e0e0;
+                font-size: 9px;
+            }
+            .compact-table .metric-col {
+                font-weight: 600;
+                font-size: 8px;
+            }
+            .compact-table .tire-cell {
+                cursor: pointer;
+                font-size: 8px;
+                padding: 1px 3px;
+            }
+            .compact-table .tire-cell:hover {
+                background: #fff9c4 !important;
+            }
+            .compact-table .tire-cell.selected {
+                background: #a5d6a7 !important;
+                font-weight: bold;
+            }
+            .compact-table .tire-cell.left {
+                border-left: 2px solid #FF13F0;
+            }
+            .compact-table .tire-cell.right {
+                border-left: 2px solid #9E9E9E;
+            }
+            .compact-table .tire-cell.pool-a {
+                border-left: 2px solid #F57C00;
+            }
+            .compact-table .tire-cell.pool-b {
+                border-left: 2px solid #00897B;
+            }
             </style>
-            {table_html}
-            {js_code}
             '''
 
+            full_html = f'{compact_css}{table_html}{js_code}'
             components.html(full_html, height=600, scrolling=True)
         else:
             # --- NORMAL CARD VIEW ---
