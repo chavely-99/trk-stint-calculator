@@ -156,75 +156,31 @@ button[kind="primary"]:hover {
     font-weight: bold;
     font-size: 10px;
 }
-.compact-table .tire-grid-cell {
-    padding: 1px;
-}
-
-/* 2x2 tire grid within table cell */
-.compact-tire-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr 1fr;
-    gap: 0;
-    width: 100%;
-    max-width: 220px;
-    margin: 0 auto;
-}
-.compact-tire {
-    background: transparent;
-    border: none;
-    border-left: 2px solid transparent;
-    padding: 1px 2px;
+/* Tire cells - Excel style */
+.compact-table .tire-cell {
     cursor: pointer;
     font-size: 8px;
-    line-height: 1.1;
-    text-align: center;
+    line-height: 1.2;
+    padding: 2px 4px;
 }
-.compact-tire:hover {
-    background: #fff9c4;
+.compact-table .tire-cell:hover {
+    background: #fffde7;
 }
-.compact-tire.selected {
+.compact-table .tire-cell.selected {
     background: #c8e6c9;
-}
-.compact-tire.left {
-    border-left: 2px solid #FF13F0;
-}
-.compact-tire.right {
-    border-left: 2px solid #9E9E9E;
-}
-.compact-tire.pool-a {
-    border-left: 2px solid #F57C00;
-}
-.compact-tire.pool-b {
-    border-left: 2px solid #00897B;
-}
-.compact-tire .tire-corner {
     font-weight: bold;
-    font-size: 7px;
-    color: #666;
-    margin: 0;
 }
-.compact-tire .tire-rollout {
-    font-weight: bold;
-    font-size: 10px;
-    color: #000;
-    margin: 0;
+.compact-table .tire-cell.left {
+    border-left: 3px solid #FF13F0;
 }
-.compact-tire .tire-rate {
-    font-weight: 600;
-    font-size: 9px;
-    color: #333;
-    margin: 0;
+.compact-table .tire-cell.right {
+    border-left: 3px solid #9E9E9E;
 }
-.compact-tire .tire-shift {
-    font-size: 7px;
-    color: #666;
-    margin: 0;
+.compact-table .tire-cell.pool-a {
+    border-left: 3px solid #F57C00;
 }
-.compact-tire .tire-date {
-    font-size: 6px;
-    color: #999;
-    margin: 0;
+.compact-table .tire-cell.pool-b {
+    border-left: 3px solid #00897B;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -1744,12 +1700,12 @@ with tab_results:
         is_road_results = st.session_state.track_type == 'Road Course'
 
         if is_compact:
-            # --- COMPACT TABLE VIEW ---
-            # Build HTML table with 2x2 tire grid in single cell
+            # --- COMPACT TABLE VIEW (Excel-like) ---
+            # Build HTML table with separate columns for each tire
             table_html = '<table class="compact-table"><thead><tr>'
             table_html += '<th class="set-col">Set</th>'
             table_html += '<th class="metric-col">F.Stag</th>'
-            table_html += '<th>Tires</th>'
+            table_html += '<th>LF</th><th>RF</th><th>LR</th><th>RR</th>'
             table_html += '<th class="metric-col">R.Stag</th>'
             table_html += '<th class="metric-col">Cross %</th>'
             table_html += '</tr></thead><tbody>'
@@ -1763,10 +1719,7 @@ with tab_results:
                 # Front stagger
                 table_html += f'<td class="metric-col">{s.get("front_stagger", 0):.1f}</td>'
 
-                # 2x2 Tire grid in single cell
-                table_html += '<td class="tire-grid-cell"><div class="compact-tire-grid">'
-
-                # Corners in 2x2 layout: LF, RF (top row), LR, RR (bottom row)
+                # Four tire columns
                 corners = ['LF', 'RF', 'LR', 'RR']
                 tire_keys = ['lf_data', 'rf_data', 'lr_data', 'rr_data']
 
@@ -1787,15 +1740,10 @@ with tab_results:
                     date = tire.get('Date Code', '')
                     date_str = str(date).strip() if date and str(date).strip() not in ('', 'nan') else '-'
 
-                    table_html += f'<div class="compact-tire {color_class}{sel_class}" id="tire_{set_idx}_{corner}">'
-                    table_html += f'<div class="tire-corner">{corner}</div>'
-                    table_html += f'<div class="tire-rollout">{tire["Rollout/Dia"]:.0f}</div>'
-                    table_html += f'<div class="tire-rate">{int(tire["Rate"])}</div>'
-                    table_html += f'<div class="tire-shift">{shift}</div>'
-                    table_html += f'<div class="tire-date">{date_str}</div>'
-                    table_html += '</div>'
-
-                table_html += '</div></td>'  # Close tire grid cell
+                    # Simple text display - just the essential data
+                    table_html += f'<td class="tire-cell {color_class}{sel_class}" id="tire_{set_idx}_{corner}">'
+                    table_html += f'{tire["Rollout/Dia"]:.0f}<br>{int(tire["Rate"])}<br>{shift}<br>{date_str}'
+                    table_html += '</td>'
 
                 # Rear stagger
                 table_html += f'<td class="metric-col">{s["stagger"]:.1f}</td>'
