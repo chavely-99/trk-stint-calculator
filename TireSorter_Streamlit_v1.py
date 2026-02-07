@@ -45,39 +45,40 @@ div[role="tablist"] { margin-top: .25rem; }
 div[data-testid="stDecoration"] { display: none; }
 
 .car-header {
-    color: #333;
-    font-weight: bold;
-    font-size: 18px;
+    color: #111;
+    font-weight: 800;
+    font-size: 20px;
     margin-bottom: 6px;
     text-align: center;
 }
 .car-stats {
-    color: #444;
+    color: #222;
     font-size: 14px;
     text-align: center;
-    margin-bottom: 8px;
-    padding: 6px 10px;
-    background: #f5f5f5;
-    border-radius: 4px;
-    font-weight: 500;
+    margin-bottom: 4px;
+    padding: 5px 10px;
+    background: #e3f2fd;
+    border-radius: 6px;
+    font-weight: 600;
+    border: 1px solid #90caf9;
 }
 .tire-box {
-    background: #fafafa;
+    background: #f8f8f8;
     border-radius: 8px;
-    padding: 10px;
+    padding: 6px;
     text-align: left;
     color: #333;
     font-size: 13px;
-    border: 1px solid #ddd;
+    border: 2px solid #ccc;
 }
 /* Oval: left side (neon pink) / right side (grey) */
-.tire-box.left { border-left: 5px solid #FF13F0; background: #fff0fd; }
-.tire-box.right { border-left: 5px solid #9E9E9E; background: #f5f5f5; }
+.tire-box.left { border-left: 6px solid #FF13F0; background: #fff0fd; }
+.tire-box.right { border-left: 6px solid #757575; background: #eeeeee; }
 /* Road Course: A-pool (amber) / non-A pool (teal) */
-.tire-box.pool-a { border-left: 5px solid #F57C00; background: #fff8f0; }
-.tire-box.pool-b { border-left: 5px solid #00897B; background: #f0faf9; }
-.tire-corner { font-weight: bold; color: #555; font-size: 15px; text-transform: uppercase; text-align: center; margin-bottom: 4px; }
-.tire-row { display: flex; justify-content: space-between; align-items: center; margin: 3px 0; }
+.tire-box.pool-a { border-left: 6px solid #F57C00; background: #fff8f0; }
+.tire-box.pool-b { border-left: 6px solid #00897B; background: #e0f2f1; }
+.tire-corner { font-weight: bold; color: #555; font-size: 15px; text-transform: uppercase; text-align: center; margin-bottom: 2px; }
+.tire-row { display: flex; justify-content: space-between; align-items: center; margin: 1px 0; }
 .tire-label { font-size: 14px; color: #555; font-weight: 600; }
 .tire-rollout { font-weight: bold; font-size: 20px; color: #1976d2; }
 .tire-rate { font-weight: bold; font-size: 17px; color: #d32f2f; }
@@ -101,11 +102,41 @@ div[data-testid="stVerticalBlockBorderWrapper"] .element-container div[data-test
 }
 .info-row b { color: #222; font-size: 16px; }
 
-/* Thicker borders on set cards */
+/* Strong borders and shadow on set cards for better contrast */
 div[data-testid="stVerticalBlockBorderWrapper"] {
-    border-width: 3px !important;
-    border-color: #999 !important;
-    border-radius: 10px !important;
+    border-width: 4px !important;
+    border-color: #666 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+    background: white !important;
+    margin-bottom: 2px !important;
+    margin-top: 2px !important;
+}
+
+/* Reduce vertical spacing in columns to fit both rows without scrolling */
+div[data-testid="column"] {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+/* Reduce spacing between rows */
+div[data-testid="stHorizontalBlock"] {
+    gap: 0.25rem !important;
+    margin-bottom: 0.25rem !important;
+}
+
+/* Alternating set card backgrounds for visual grouping */
+div[data-testid="column"]:nth-child(odd) div[data-testid="stVerticalBlockBorderWrapper"] {
+    background: #fafafa !important;
+}
+div[data-testid="column"]:nth-child(even) div[data-testid="stVerticalBlockBorderWrapper"] {
+    background: white !important;
+}
+
+/* Set number buttons - make bold and prominent */
+div[data-testid="stVerticalBlockBorderWrapper"] button {
+    font-weight: 800 !important;
+    font-size: 18px !important;
 }
 
 /* Green Run button — distinct from priority drag items */
@@ -1287,7 +1318,7 @@ def render_tire_html(tire, corner: str, highlight: bool = False, road_course: bo
     hl = "border: 2px solid #2e7d32; box-shadow: 0 0 8px rgba(46,125,50,0.35);" if highlight else ""
     return (
         f'<div class="tire-box {css_class}" style="{hl}">'
-        f'<div class="tire-corner">{corner}</div>'
+        # f'<div class="tire-corner">{corner}</div>'  # Removed to save vertical space - position is clear from layout
         f'<div class="tire-row"><span class="tire-label">Roll:</span><span class="tire-rollout">{tire["Rollout/Dia"]:.0f}</span></div>'
         f'<div class="tire-row"><span class="tire-label">Rate:</span><span class="tire-rate">{int(tire["Rate"])}</span></div>'
         f'<div class="tire-row"><span class="tire-label">Shift:</span><span class="tire-shift">{shift}</span></div>'
@@ -1297,20 +1328,24 @@ def render_tire_html(tire, corner: str, highlight: bool = False, road_course: bo
 
 
 # ============== MAIN AREA ==============
-st.markdown(f"#### {APP_TITLE}")
+# st.markdown(f"#### {APP_TITLE}")  # Removed to save vertical space
 
-tab_settings, tab_results = st.tabs(["Setup & Sort", "Results & Refine"])
+tab_settings, tab_results = st.tabs(["⚙️ Setup & Sort", "🎯 Results & Refine"])
 
 # ---------- TAB 1: SETUP & SORT ----------
 with tab_settings:
-    # --- Import Data Section ---
-    st.markdown("### Import Data")
+    # Two-column layout for compact display
+    left_setup_col, right_setup_col = st.columns([1, 1])
 
-    uploaded_file = st.file_uploader(
-        "Upload Excel File",
-        type=['xlsx', 'xlsm', 'xls'],
-        help="Excel file with Scan Data sheet"
-    )
+    with left_setup_col:
+        # --- Import Data Section ---
+        st.markdown("### Import Data")
+
+        uploaded_file = st.file_uploader(
+            "Upload Excel File",
+            type=['xlsx', 'xlsm', 'xls'],
+            help="Excel file with Scan Data sheet"
+        )
 
     if uploaded_file is not None:
         token = (uploaded_file.name, uploaded_file.size)
@@ -1353,79 +1388,80 @@ with tab_settings:
             except Exception as e:
                 st.error(f"Error: {e}")
 
-    st.divider()
+    with left_setup_col:
+        st.divider()
 
-    # --- Track Type Section ---
-    track_type = st.radio(
-        "Track Type",
-        options=['Oval', 'Road Course'],
-        index=0 if st.session_state.track_type == 'Oval' else 1,
-        horizontal=True,
-        key='track_type_selector'
-    )
-    st.session_state.track_type = track_type
+        # --- Track Type Section ---
+        track_type = st.radio(
+            "Track Type",
+            options=['Oval', 'Road Course'],
+            index=0 if st.session_state.track_type == 'Oval' else 1,
+            horizontal=True,
+            key='track_type_selector'
+        )
+        st.session_state.track_type = track_type
 
-    st.divider()
+        st.divider()
 
-    # --- Tire Setup Info ---
-    if st.session_state.data_loaded and st.session_state.tire_df is not None:
-        st.markdown("### Tire Setup")
-        df = st.session_state.tire_df
+        # --- Tire Setup Info ---
+        if st.session_state.data_loaded and st.session_state.tire_df is not None:
+            st.markdown("### Tire Setup")
+            df = st.session_state.tire_df
 
-        if track_type == 'Oval':
-            # Show D-Code selector for Oval
-            dcodes = st.session_state.available_dcodes
-            if dcodes and len(dcodes) >= 2:
-                ls_dcode = st.selectbox(
-                    "Left Side D-Code",
-                    options=dcodes,
-                    index=dcodes.index(st.session_state.ls_dcode) if st.session_state.ls_dcode in dcodes else 0,
-                    key='ls_dcode_selector'
-                )
-                st.session_state.ls_dcode = ls_dcode
+            if track_type == 'Oval':
+                # Show D-Code selector for Oval
+                dcodes = st.session_state.available_dcodes
+                if dcodes and len(dcodes) >= 2:
+                    ls_dcode = st.selectbox(
+                        "Left Side D-Code",
+                        options=dcodes,
+                        index=dcodes.index(st.session_state.ls_dcode) if st.session_state.ls_dcode in dcodes else 0,
+                        key='ls_dcode_selector'
+                    )
+                    st.session_state.ls_dcode = ls_dcode
 
-                rs_dcodes = [d for d in dcodes if d != ls_dcode]
-                st.caption(f"Right Side: **{', '.join(rs_dcodes)}**")
-        else:
-            # Road Course: Show A-pool info and update tire pools
-            if 'Wheel' not in df.columns:
-                st.warning("No Wheel column found — Road Course requires Wheel data.")
-                st.session_state.left_tires = pd.DataFrame()
-                st.session_state.right_tires = pd.DataFrame()
+                    rs_dcodes = [d for d in dcodes if d != ls_dcode]
+                    st.caption(f"Right Side: **{', '.join(rs_dcodes)}**")
             else:
-                a_pool, non_a_pool = assign_positions(df, '', track_type='Road Course')
-                st.session_state.left_tires = a_pool
-                st.session_state.right_tires = non_a_pool
-                st.caption(f"'A' Wheels (LR/RF): **{len(a_pool)}** tires")
-                st.caption(f"Non-A Wheels (LF/RR): **{len(non_a_pool)}** tires")
+                # Road Course: Show A-pool info and update tire pools
+                if 'Wheel' not in df.columns:
+                    st.warning("No Wheel column found — Road Course requires Wheel data.")
+                    st.session_state.left_tires = pd.DataFrame()
+                    st.session_state.right_tires = pd.DataFrame()
+                else:
+                    a_pool, non_a_pool = assign_positions(df, '', track_type='Road Course')
+                    st.session_state.left_tires = a_pool
+                    st.session_state.right_tires = non_a_pool
+                    st.caption(f"'A' Wheels (LR/RF): **{len(a_pool)}** tires")
+                    st.caption(f"Non-A Wheels (LF/RR): **{len(non_a_pool)}** tires")
 
-        # Update tire pools for Oval
-        if track_type == 'Oval' and st.session_state.ls_dcode:
-            left, right = assign_positions(df, st.session_state.ls_dcode, track_type='Oval')
-            st.session_state.left_tires = left
-            st.session_state.right_tires = right
+            # Update tire pools for Oval
+            if track_type == 'Oval' and st.session_state.ls_dcode:
+                left, right = assign_positions(df, st.session_state.ls_dcode, track_type='Oval')
+                st.session_state.left_tires = left
+                st.session_state.right_tires = right
 
-    st.divider()
+    # --- Main Setup Controls in RIGHT COLUMN ---
+    with right_setup_col:
+        if st.session_state.data_loaded:
+            left = st.session_state.left_tires
+            right = st.session_state.right_tires
 
-    # --- Main Setup Controls ---
-    if st.session_state.data_loaded:
-        left = st.session_state.left_tires
-        right = st.session_state.right_tires
+            if left is not None and right is not None and len(left) > 0 and len(right) > 0:
+                sa = analyze_stagger_range(left, right)
+                n_sets = sa.get('n_sets', 0)
 
-        if left is not None and right is not None and len(left) > 0 and len(right) > 0:
-            sa = analyze_stagger_range(left, right)
-            n_sets = sa.get('n_sets', 0)
+                st.markdown("### Sorting Parameters")
 
-            # --- Info row ---
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Sets Available", n_sets)
-            c2.metric("Stagger Range (any set)", f"{sa['min_single']:.0f} to {sa['max_single']:.0f}")
-            c3.metric("Stagger Range (all sets)", f"{sa['min_all_sets']:.0f} to {sa['max_all_sets']:.0f}")
+                # --- Info metrics (stacked vertically for compact display) ---
+                st.metric("Sets Available", n_sets)
+                c1, c2 = st.columns(2)
+                c1.metric("Stagger (any)", f"{sa['min_single']:.0f} to {sa['max_single']:.0f}")
+                c2.metric("Stagger (all)", f"{sa['min_all_sets']:.0f} to {sa['max_all_sets']:.0f}")
 
-            # --- Controls ---
-            col_l, col_r = st.columns(2)
+                st.divider()
 
-            with col_l:
+                # --- Controls ---
                 if track_type == 'Road Course':
                     st.session_state.target_stagger = 0.0
                     st.caption("Road Course — stagger locked to **0**")
@@ -1450,7 +1486,6 @@ with tab_settings:
                         )
                         st.session_state.stagger_tolerance = stagger_tol
 
-            with col_r:
                 rate_pref = st.selectbox(
                     "Front/Rear Rate Preference",
                     options=['Softer Rear', 'Softer Front', 'None'],
@@ -1458,15 +1493,17 @@ with tab_settings:
                 )
                 st.session_state.rate_preference = rate_pref
 
-            st.divider()
+                st.divider()
 
-            # --- Priorities ---
-            st.caption("Stagger is always #1. Drag to reorder the rest.")
-            sorted_order = sort_items(st.session_state.priority_order, direction="vertical")
-            st.session_state.priority_order = sorted_order
+                # --- Priorities ---
+                st.caption("Stagger is always #1. Drag to reorder the rest.")
+                sorted_order = sort_items(st.session_state.priority_order, direction="vertical")
+                st.session_state.priority_order = sorted_order
 
-            # --- Run button ---
-            run_sort = st.button("Run Tire Sort", use_container_width=True, type="primary")
+                st.divider()
+
+                # --- Run button ---
+                run_sort = st.button("Run Tire Sort", use_container_width=True, type="primary")
 
             if run_sort:
                 progress_bar = st.progress(0)
@@ -1543,10 +1580,10 @@ with tab_settings:
                         st.warning("Could not find a complete solution.")
                         status_text.text("No solution found.")
 
+            else:
+                st.warning("Need tires in both left and right pools.")
         else:
-            st.warning("Need tires in both left and right pools.")
-    else:
-        st.info("Upload an Excel file in the sidebar to get started.")
+            st.info("Upload an Excel file to get started.")
 
 
 # ---------- TAB 2: RESULTS & REFINE ----------
@@ -1833,9 +1870,9 @@ with tab_results:
                                                 st.toast(f"Can't swap {from_corner} with {corner} — different pools")
                                         st.rerun()
 
-        # Second row
+        # Second row - create same number of columns as row 1 for consistent sizing
         if row2_cols > 0:
-            cols_row2 = st.columns(row2_cols)
+            cols_row2 = st.columns(row1_cols)  # Create same number of columns as row 1
             for i in range(row2_cols):
                 set_idx = row1_cols + i
                 if set_idx >= n_sets:
@@ -1915,17 +1952,17 @@ with tab_results:
         sample_tire = solution[0]['lf_data']
         id_col = None
         for candidate in ['Number', 'number', 'Seq#', 'ID', 'Ref', 'Tire Number', 'Tire_Number']:
-        if candidate in sample_tire.index:
+            if candidate in sample_tire.index:
                 id_col = candidate
                 break
 
         if id_col is None:
-        st.warning(f"Could not find tire ID column. Available columns: {list(sample_tire.index)}")
+            st.warning(f"Could not find tire ID column. Available columns: {list(sample_tire.index)}")
         else:
-        # Build 2-column clipboard text: Left | Right per row
-        # Each set = 2 rows: LF/RF then LR/RR, ordered by set number
-        clip_rows = []
-        for idx, s in enumerate(solution):
+            # Build 2-column clipboard text: Left | Right per row
+            # Each set = 2 rows: LF/RF then LR/RR, ordered by set number
+            clip_rows = []
+            for idx, s in enumerate(solution):
                 lf_num = int(s['lf_data'][id_col])
                 rf_num = int(s['rf_data'][id_col])
                 lr_num = int(s['lr_data'][id_col])
@@ -1934,19 +1971,19 @@ with tab_results:
                     clip_rows.append("")  # blank row between sets
                 clip_rows.append(f"{lf_num}\t{rf_num}")
                 clip_rows.append(f"{lr_num}\t{rr_num}")
-        clip_text = "\n".join(clip_rows)
+            clip_text = "\n".join(clip_rows)
 
-        # JavaScript clipboard copy button
-        escaped = clip_text.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
-        copy_js = f"""
-        <button onclick="navigator.clipboard.writeText(`{escaped}`).then(()=>{{this.innerText='Copied!';setTimeout(()=>this.innerText='Copy Tire Numbers to Clipboard',2000)}})"
-                style="width:100%;padding:10px 20px;font-size:16px;font-weight:600;
-                       background:#2e7d32;color:white;border:none;border-radius:8px;
-                       cursor:pointer;">
-                Copy Tire Numbers to Clipboard
-        </button>
-        """
-        components.html(copy_js, height=50)
+            # JavaScript clipboard copy button
+            escaped = clip_text.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
+            copy_js = f"""
+            <button onclick="navigator.clipboard.writeText(`{escaped}`).then(()=>{{this.innerText='Copied!';setTimeout(()=>this.innerText='Copy Tire Numbers to Clipboard',2000)}})"
+                    style="width:100%;padding:10px 20px;font-size:16px;font-weight:600;
+                           background:#2e7d32;color:white;border:none;border-radius:8px;
+                           cursor:pointer;">
+                    Copy Tire Numbers to Clipboard
+            </button>
+            """
+            components.html(copy_js, height=50)
 
         with st.expander("View / Download"):
                 st.code(clip_text, language=None)
