@@ -215,7 +215,6 @@ SS_DEFAULTS = {
     'selected_tire': None,  # (set_idx, corner) or None
     'selected_set': None,   # set_idx or None (for swapping entire sets)
     # Feature enhancements
-    'compact_view': False,  # Compact display for 10+ sets
     'duplicate_warnings': [],  # List of warning messages about duplicates
 }
 
@@ -1553,14 +1552,12 @@ with tab_results:
         stats = st.session_state.stats
         has_results = True
 
-        # --- Check for duplicate tires in solution (only in normal view) ---
-        # In compact view, duplicates are detected and shown inline with the table
-        if not st.session_state.compact_view:
-            sol_warnings = detect_solution_duplicates(solution)
-            if sol_warnings:
-                st.error("⚠️ Duplicate tires detected in solution:")
-                for warning in sol_warnings:
-                    st.error(warning)
+        # --- Check for duplicate tires in solution ---
+        sol_warnings = detect_solution_duplicates(solution)
+        if sol_warnings:
+            st.error("⚠️ Duplicate tires detected in solution:")
+            for warning in sol_warnings:
+                st.error(warning)
 
         # --- Refine toolbar ---
         rate_pref = st.session_state.rate_preference
@@ -1685,300 +1682,105 @@ with tab_results:
             st.session_state.results = solution
             st.session_state.selected_set = None
 
-        # --- Compact view toggle (appears when 10+ sets) ---
-        if len(solution) >= 10:
-            compact = st.toggle("Compact View", value=st.session_state.compact_view,
-                              help="Show 6-8 sets per row with smaller cards")
-            st.session_state.compact_view = compact
-        else:
-            st.session_state.compact_view = False  # Reset if < 10 sets
-
         # --- Interactive car cards grid ---
-        is_compact = st.session_state.compact_view
         is_road_results = st.session_state.track_type == 'Road Course'
+        # --- CARD VIEW WITH 2-ROW AUTO-FIT LAYOUT ---
+        import math
 
-        if is_compact:
-            # --- COMPACT TABLE VIEW (11 columns, 2 rows per set) ---
-            # Helper to get tire data safely
-            def get_val(tire, field, default='-'):
-                val = tire.get(field, default) if field in tire.index else default
-                return str(val) if val and str(val) not in ['nan', 'None', ''] else '-'
-
-            # Build DataFrame for editable table
-            table_rows = []
-            row_metadata = []  # Track set_idx and position (front/rear) for each row
-            all_ls_ids = []
-            all_rs_ids = []
-            all_tire_data = []  # Store tire data for duplicate checking
-
-            # First pass: collect all IDs
-            for set_idx, s in enumerate(solution):
-                lf = s['lf_data']
-                rf = s['rf_data']
-                lr = s['lr_data']
-                rr = s['rr_data']
-
-                lf_num = int(lf['Number']) if 'Number' in lf.index else 0
-                rf_num = int(rf['Number']) if 'Number' in rf.index else 0
-                lr_num = int(lr['Number']) if 'Number' in lr.index else 0
-                rr_num = int(rr['Number']) if 'Number' in rr.index else 0
-
-                all_tire_data.append({
-                    'set_idx': set_idx,
-                    'lf_num': lf_num, 'rf_num': rf_num,
-                    'lr_num': lr_num, 'rr_num': rr_num,
-                    'tires': (lf, rf, lr, rr)
-                })
-                all_ls_ids.extend([lf_num, lr_num])
-                all_rs_ids.extend([rf_num, rr_num])
-
-            # Detect duplicates
-            dup_ls = set([x for x in all_ls_ids if x > 0 and all_ls_ids.count(x) > 1])
-            dup_rs = set([x for x in all_rs_ids if x > 0 and all_rs_ids.count(x) > 1])
-
-            # Find missing IDs if duplicates exist
-            missing_ls = set()
-            missing_rs = set()
-            if dup_ls or dup_rs:
-                # Get available IDs from tire pools
-                left_pool = st.session_state.get('left_tires', pd.DataFrame())
-                right_pool = st.session_state.get('right_tires', pd.DataFrame())
-
-                if not left_pool.empty and 'Number' in left_pool.columns:
-                    available_ls = set([int(x) for x in left_pool['Number'].dropna() if x > 0])
-                    used_ls = set([x for x in all_ls_ids if x > 0])
-                    missing_ls = available_ls - used_ls
-
-                if not right_pool.empty and 'Number' in right_pool.columns:
-                    available_rs = set([int(x) for x in right_pool['Number'].dropna() if x > 0])
-                    used_rs = set([x for x in all_rs_ids if x > 0])
-                    missing_rs = available_rs - used_rs
-
-            # Second pass: build table with duplicate markers
-            for data in all_tire_data:
-                set_idx = data['set_idx']
-                lf, rf, lr, rr = data['tires']
-                lf_num, rf_num = data['lf_num'], data['rf_num']
-                lr_num, rr_num = data['lr_num'], data['rr_num']
-                s = solution[set_idx]
-
-                # Add warning symbol to duplicates
-                lf_display = f"⚠️ {lf_num}" if lf_num in dup_ls else str(lf_num)
-                rf_display = f"⚠️ {rf_num}" if rf_num in dup_rs else str(rf_num)
-                lr_display = f"⚠️ {lr_num}" if lr_num in dup_ls else str(lr_num)
-                rr_display = f"⚠️ {rr_num}" if rr_num in dup_rs else str(rr_num)
-
-                # Front row
-                table_rows.append({
-                    'Set': set_idx + 1,
-                    'LS ID': lf_display,
-                    'RS ID': rf_display,
-                    'LS Rollout': int(lf['Rollout/Dia']),
-                    'RS Rollout': int(rf['Rollout/Dia']),
-                    'LS Rate': int(lf['Rate']),
-                    'RS Rate': int(rf['Rate']),
-                    'LS Date': get_val(lf, 'Date Code'),
-                    'RS Date': get_val(rf, 'Date Code'),
-                    'LS Shift': get_val(lf, 'Shift'),
-                    'RS Shift': get_val(rf, 'Shift'),
-                    'Cross%': f"{s['cross']*100:.2f}",
-                    'Stagger': f"{s.get('front_stagger', 0):.1f}"
-                })
-                row_metadata.append({'set_idx': set_idx, 'position': 'front', 'ls_num': lf_num, 'rs_num': rf_num})
-
-                # Rear row
-                table_rows.append({
-                    'Set': '',
-                    'LS ID': lr_display,
-                    'RS ID': rr_display,
-                    'LS Rollout': int(lr['Rollout/Dia']),
-                    'RS Rollout': int(rr['Rollout/Dia']),
-                    'LS Rate': int(lr['Rate']),
-                    'RS Rate': int(rr['Rate']),
-                    'LS Date': get_val(lr, 'Date Code'),
-                    'RS Date': get_val(rr, 'Date Code'),
-                    'LS Shift': get_val(lr, 'Shift'),
-                    'RS Shift': get_val(rr, 'Shift'),
-                    'Cross%': '',
-                    'Stagger': f"{s['stagger']:.1f}"
-                })
-                row_metadata.append({'set_idx': set_idx, 'position': 'rear', 'ls_num': lr_num, 'rs_num': rr_num})
-
-            df = pd.DataFrame(table_rows)
-
-            # Display duplicate and missing ID warnings
-            if dup_ls or dup_rs or missing_ls or missing_rs:
-                warning_parts = []
-                if dup_ls:
-                    warning_parts.append(f"**Duplicate LS:** {', '.join(map(str, sorted(dup_ls)))}")
-                if dup_rs:
-                    warning_parts.append(f"**Duplicate RS:** {', '.join(map(str, sorted(dup_rs)))}")
-                if missing_ls:
-                    warning_parts.append(f"**Missing LS:** {', '.join(map(str, sorted(missing_ls)))}")
-                if missing_rs:
-                    warning_parts.append(f"**Missing RS:** {', '.join(map(str, sorted(missing_rs)))}")
-
-                st.warning("⚠️ " + " | ".join(warning_parts))
-
-            # Display full-length table with enhanced visual grouping
-            st.markdown("""
-            <style>
-            div[data-testid="stDataFrame"] {
-                border: 3px solid #333;
-            }
-            div[data-testid="stDataFrame"] table {
-                border-collapse: collapse;
-            }
-            div[data-testid="stDataFrame"] th {
-                background-color: #1f77b4 !important;
-                color: white !important;
-                font-weight: bold !important;
-                border: 2px solid #333 !important;
-                padding: 8px !important;
-            }
-            div[data-testid="stDataFrame"] td {
-                border: 2px solid #666 !important;
-                padding: 6px !important;
-            }
-
-            /* Alternating set backgrounds - every pair of rows */
-            div[data-testid="stDataFrame"] tbody tr:nth-child(4n+1),
-            div[data-testid="stDataFrame"] tbody tr:nth-child(4n+2) {
-                background-color: #f8f8f8 !important;  /* Light gray for sets 1,3,5,7... */
-            }
-            div[data-testid="stDataFrame"] tbody tr:nth-child(4n+3),
-            div[data-testid="stDataFrame"] tbody tr:nth-child(4n+4) {
-                background-color: #ffffff !important;  /* White for sets 2,4,6,8... */
-            }
-
-            /* Enhanced Set # column - provides vertical anchor */
-            div[data-testid="stDataFrame"] tbody td:first-child {
-                background-color: #d0e8f2 !important;  /* Light blue */
-                font-weight: bold !important;
-                font-size: 14px !important;
-                border-right: 4px solid #1f77b4 !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-
-            edited_df = st.data_editor(
-                df,
-                use_container_width=True,
-                hide_index=True,
-                height=len(df) * 45 + 50,  # Dynamic height: ~45px per row + 50px for header
-                column_config={
-                    'Set': st.column_config.TextColumn('Set #', width='small', disabled=True),
-                    'LS ID': st.column_config.TextColumn('LS ID', width='medium'),
-                    'RS ID': st.column_config.TextColumn('RS ID', width='medium'),
-                    'LS Rollout': st.column_config.NumberColumn('LS Rollout', width='small', disabled=True),
-                    'RS Rollout': st.column_config.NumberColumn('RS Rollout', width='small', disabled=True),
-                    'LS Rate': st.column_config.NumberColumn('LS Rate', width='small', disabled=True),
-                    'RS Rate': st.column_config.NumberColumn('RS Rate', width='small', disabled=True),
-                    'LS Date': st.column_config.TextColumn('LS Date', width='small', disabled=True),
-                    'RS Date': st.column_config.TextColumn('RS Date', width='small', disabled=True),
-                    'LS Shift': st.column_config.TextColumn('LS Shift', width='small', disabled=True),
-                    'RS Shift': st.column_config.TextColumn('RS Shift', width='small', disabled=True),
-                    'Cross%': st.column_config.TextColumn('Cross%', width='small', disabled=True),
-                    'Stagger': st.column_config.TextColumn('Stagger', width='small', disabled=True),
-                },
-                key='compact_table_editor'
-            )
-
-            # Detect changes and perform swaps
-            if edited_df is not None:
-                # Get tire pools from session state
-                left_pool = st.session_state.get('left_tires', pd.DataFrame())
-                right_pool = st.session_state.get('right_tires', pd.DataFrame())
-
-                # For road course, split into A and non-A pools
-                if is_road_results and not left_pool.empty:
-                    left_a = left_pool[left_pool['D-Code'].str.endswith('A', na=False)]
-                    left_non_a = left_pool[~left_pool['D-Code'].str.endswith('A', na=False)]
-                    right_a = right_pool[right_pool['D-Code'].str.endswith('A', na=False)]
-                    right_non_a = right_pool[~right_pool['D-Code'].str.endswith('A', na=False)]
-                else:
-                    left_a = left_non_a = left_pool
-                    right_a = right_non_a = right_pool
-
-                changes_detected = False
-                for row_idx in range(len(df)):
-                    meta = row_metadata[row_idx]
-                    set_idx = meta['set_idx']
-                    is_front = meta['position'] == 'front'
-                    old_ls_num = meta['ls_num']
-                    old_rs_num = meta['rs_num']
-
-                    # Check LS ID change - strip warning symbols
-                    new_ls_str = str(edited_df.at[row_idx, 'LS ID']).replace('⚠️', '').strip()
-                    try:
-                        new_ls = int(new_ls_str)
-                    except (ValueError, TypeError):
-                        new_ls = 0
-
-                    if old_ls_num != new_ls and new_ls > 0:
-                        corner = 'lf' if is_front else 'lr'
-                        # Find tire with new ID in available pool
-                        target_tire = None
-                        if is_road_results:
-                            pool = left_a if solution[set_idx][f'{corner}_data']['D-Code'].endswith('A') else left_non_a
-                        else:
-                            pool = left_pool
-
-                        for _, tire in pool.iterrows():
-                            if 'Number' in tire.index and int(tire['Number']) == new_ls:
-                                target_tire = tire
-                                break
-
-                        if target_tire is not None:
-                            solution[set_idx][f'{corner}_data'] = target_tire
-                            changes_detected = True
-
-                    # Check RS ID change - strip warning symbols
-                    new_rs_str = str(edited_df.at[row_idx, 'RS ID']).replace('⚠️', '').strip()
-                    try:
-                        new_rs = int(new_rs_str)
-                    except (ValueError, TypeError):
-                        new_rs = 0
-
-                    if old_rs_num != new_rs and new_rs > 0:
-                        corner = 'rf' if is_front else 'rr'
-                        # Find tire with new ID in available pool
-                        target_tire = None
-                        if is_road_results:
-                            pool = right_a if solution[set_idx][f'{corner}_data']['D-Code'].endswith('A') else right_non_a
-                        else:
-                            pool = right_pool
-
-                        for _, tire in pool.iterrows():
-                            if 'Number' in tire.index and int(tire['Number']) == new_rs:
-                                target_tire = tire
-                                break
-
-                        if target_tire is not None:
-                            solution[set_idx][f'{corner}_data'] = target_tire
-                            changes_detected = True
-
-                if changes_detected:
-                    # Recalculate metrics for affected sets
-                    for set_idx in range(len(solution)):
-                        metrics = compute_set_metrics(
-                            solution[set_idx]['lf_data'],
-                            solution[set_idx]['rf_data'],
-                            solution[set_idx]['lr_data'],
-                            solution[set_idx]['rr_data']
-                        )
-                        solution[set_idx].update(metrics)
-
-                    st.session_state.results = solution
-                    st.rerun()
+        # Calculate columns per row to fit all sets in 2 rows maximum
+        n_sets = len(solution)
+        if n_sets <= 5:
+            # Single row for 5 or fewer sets
+            row1_cols = n_sets
+            row2_cols = 0
         else:
-            # --- NORMAL CARD VIEW ---
-            n_cols = min(len(solution), 5)
-            cols = st.columns(n_cols)
+            # Two rows - distribute sets evenly
+            cols_per_row = math.ceil(n_sets / 2)
+            row1_cols = cols_per_row
+            row2_cols = n_sets - cols_per_row
 
-            for set_idx, s in enumerate(solution):
-                col_idx = set_idx % n_cols
-                with cols[col_idx]:
+        # First row
+        if row1_cols > 0:
+            cols_row1 = st.columns(row1_cols)
+            for i in range(row1_cols):
+                set_idx = i
+                if set_idx >= n_sets:
+                    break
+                s = solution[set_idx]
+                with cols_row1[i]:
+                    with st.container(border=True):
+                        # Set header — clickable for set-level swap
+                        is_set_sel = selected_set == set_idx
+                        if st.button(f"Set {set_idx + 1}", key=f"setswap_{set_idx}",
+                                     use_container_width=True,
+                                     type="primary" if is_set_sel else "secondary"):
+                            if selected_set is None:
+                                st.session_state.selected_set = set_idx
+                                st.session_state.selected_tire = None
+                            elif is_set_sel:
+                                st.session_state.selected_set = None
+                            else:
+                                do_set_swap(selected_set, set_idx)
+                            st.rerun()
+
+                        # Stats bar
+                        st.markdown(
+                            f'<div class="car-stats">'
+                            f'R.Stag: {s["stagger"]:.1f} &nbsp;|&nbsp; '
+                            f'F.Stag: {s.get("front_stagger", 0):.1f} &nbsp;|&nbsp; '
+                            f'Cross: {s["cross"]*100:.2f}%'
+                            f'</div>',
+                            unsafe_allow_html=True
+                        )
+
+                        # 2x2 tire grid — matches car layout
+                        tire_rows = [
+                            ('LF', 'lf_data', 'RF', 'rf_data'),
+                            ('LR', 'lr_data', 'RR', 'rr_data'),
+                        ]
+                        for l_corner, l_key, r_corner, r_key in tire_rows:
+                            left_col, right_col = st.columns(2)
+                            for col, corner, tire_key in [(left_col, l_corner, l_key), (right_col, r_corner, r_key)]:
+                                with col:
+                                    is_sel = selected == (set_idx, corner)
+                                    st.markdown(
+                                        render_tire_html(s[tire_key], corner, highlight=is_sel,
+                                                       road_course=is_road_results, compact=False),
+                                        unsafe_allow_html=True
+                                    )
+                                    btn_type = "primary" if is_sel else "secondary"
+                                    if st.button(corner, key=f"tire_{set_idx}_{corner}",
+                                                 use_container_width=True, type=btn_type):
+                                        st.session_state.selected_set = None
+                                        if selected is None:
+                                            st.session_state.selected_tire = (set_idx, corner)
+                                        elif is_sel:
+                                            st.session_state.selected_tire = None
+                                        else:
+                                            # Enforce pool constraints on manual swaps
+                                            from_corner = selected[1]
+                                            if is_road_results:
+                                                pool_a = {'LR', 'RF'}
+                                                same_pool = (from_corner in pool_a) == (corner in pool_a)
+                                            else:
+                                                left_pool = {'LF', 'LR'}
+                                                same_pool = (from_corner in left_pool) == (corner in left_pool)
+                                            if same_pool:
+                                                do_swap(selected[0], selected[1], set_idx, corner)
+                                            else:
+                                                st.session_state.selected_tire = None
+                                                st.toast(f"Can't swap {from_corner} with {corner} — different pools")
+                                        st.rerun()
+
+        # Second row
+        if row2_cols > 0:
+            cols_row2 = st.columns(row2_cols)
+            for i in range(row2_cols):
+                set_idx = row1_cols + i
+                if set_idx >= n_sets:
+                    break
+                s = solution[set_idx]
+                with cols_row2[i]:
                     with st.container(border=True):
                         # Set header — clickable for set-level swap
                         is_set_sel = selected_set == set_idx
@@ -2052,17 +1854,17 @@ with tab_results:
         sample_tire = solution[0]['lf_data']
         id_col = None
         for candidate in ['Number', 'number', 'Seq#', 'ID', 'Ref', 'Tire Number', 'Tire_Number']:
-            if candidate in sample_tire.index:
+        if candidate in sample_tire.index:
                 id_col = candidate
                 break
 
         if id_col is None:
-            st.warning(f"Could not find tire ID column. Available columns: {list(sample_tire.index)}")
+        st.warning(f"Could not find tire ID column. Available columns: {list(sample_tire.index)}")
         else:
-            # Build 2-column clipboard text: Left | Right per row
-            # Each set = 2 rows: LF/RF then LR/RR, ordered by set number
-            clip_rows = []
-            for idx, s in enumerate(solution):
+        # Build 2-column clipboard text: Left | Right per row
+        # Each set = 2 rows: LF/RF then LR/RR, ordered by set number
+        clip_rows = []
+        for idx, s in enumerate(solution):
                 lf_num = int(s['lf_data'][id_col])
                 rf_num = int(s['rf_data'][id_col])
                 lr_num = int(s['lr_data'][id_col])
@@ -2071,21 +1873,21 @@ with tab_results:
                     clip_rows.append("")  # blank row between sets
                 clip_rows.append(f"{lf_num}\t{rf_num}")
                 clip_rows.append(f"{lr_num}\t{rr_num}")
-            clip_text = "\n".join(clip_rows)
+        clip_text = "\n".join(clip_rows)
 
-            # JavaScript clipboard copy button
-            escaped = clip_text.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
-            copy_js = f"""
-            <button onclick="navigator.clipboard.writeText(`{escaped}`).then(()=>{{this.innerText='Copied!';setTimeout(()=>this.innerText='Copy Tire Numbers to Clipboard',2000)}})"
+        # JavaScript clipboard copy button
+        escaped = clip_text.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
+        copy_js = f"""
+        <button onclick="navigator.clipboard.writeText(`{escaped}`).then(()=>{{this.innerText='Copied!';setTimeout(()=>this.innerText='Copy Tire Numbers to Clipboard',2000)}})"
                 style="width:100%;padding:10px 20px;font-size:16px;font-weight:600;
                        background:#2e7d32;color:white;border:none;border-radius:8px;
                        cursor:pointer;">
                 Copy Tire Numbers to Clipboard
-            </button>
-            """
-            components.html(copy_js, height=50)
+        </button>
+        """
+        components.html(copy_js, height=50)
 
-            with st.expander("View / Download"):
+        with st.expander("View / Download"):
                 st.code(clip_text, language=None)
                 st.download_button(
                     "Download as TXT",
