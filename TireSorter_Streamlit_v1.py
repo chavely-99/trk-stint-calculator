@@ -1726,9 +1726,9 @@ with tab_results:
                         # Stats bar
                         st.markdown(
                             f'<div class="car-stats">'
-                            f'R.Stag: {s["stagger"]:.1f} &nbsp;|&nbsp; '
-                            f'F.Stag: {s.get("front_stagger", 0):.1f} &nbsp;|&nbsp; '
-                            f'Cross: {s["cross"]*100:.2f}%'
+                            f'F.Stagger: {s.get("front_stagger", 0):.1f} &nbsp;|&nbsp; '
+                            f'Cross %: {s["cross"]*100:.2f}% &nbsp;|&nbsp; '
+                            f'R.Stagger: {s["stagger"]:.1f}'
                             f'</div>',
                             unsafe_allow_html=True
                         )
@@ -1799,9 +1799,9 @@ with tab_results:
                         # Stats bar
                         st.markdown(
                             f'<div class="car-stats">'
-                            f'R.Stag: {s["stagger"]:.1f} &nbsp;|&nbsp; '
-                            f'F.Stag: {s.get("front_stagger", 0):.1f} &nbsp;|&nbsp; '
-                            f'Cross: {s["cross"]*100:.2f}%'
+                            f'F.Stagger: {s.get("front_stagger", 0):.1f} &nbsp;|&nbsp; '
+                            f'Cross %: {s["cross"]*100:.2f}% &nbsp;|&nbsp; '
+                            f'R.Stagger: {s["stagger"]:.1f}'
                             f'</div>',
                             unsafe_allow_html=True
                         )
