@@ -302,7 +302,7 @@ def load_tire_data(file_source) -> pd.DataFrame:
 
     except Exception as scan_err:
         # Fall back to TireScan sheet
-        st.sidebar.warning(f"Scan Data sheet not found — using TireScan fallback.")
+        st.warning(f"Scan Data sheet not found — using TireScan fallback.")
         df = pd.read_excel(file_source, sheet_name='TireScan')
 
     # --- Standard cleanup (works for both sheet sources) ---
@@ -1296,107 +1296,6 @@ def render_tire_html(tire, corner: str, highlight: bool = False, road_course: bo
     )
 
 
-# ============== SIDEBAR ==============
-st.sidebar.markdown("### Import Data")
-
-uploaded_file = st.sidebar.file_uploader(
-    "Upload Excel File",
-    type=['xlsx', 'xlsm', 'xls'],
-    help="Excel file with Scan Data sheet"
-)
-
-if uploaded_file is not None:
-    token = (uploaded_file.name, uploaded_file.size)
-    if st.session_state._upload_token != token:
-        try:
-            df = load_tire_data(uploaded_file)
-            st.session_state.tire_df = df
-            st.session_state._upload_token = token
-
-            dcodes = sorted(df['D-Code'].unique().tolist())
-            st.session_state.available_dcodes = dcodes
-
-            # Auto-select LS D-Code as the one with smaller avg rollout
-            # so that stagger (RR - LR) is positive
-            if len(dcodes) >= 2:
-                avg_rollouts = {d: df[df['D-Code'] == d]['Rollout/Dia'].mean() for d in dcodes}
-                st.session_state.ls_dcode = min(avg_rollouts, key=avg_rollouts.get)
-            elif dcodes:
-                st.session_state.ls_dcode = dcodes[0]
-            else:
-                st.session_state.ls_dcode = None
-
-            # Set default stagger target to max achievable for all sets
-            if st.session_state.ls_dcode is not None:
-                _left, _right = assign_positions(df, st.session_state.ls_dcode)
-                _sa = analyze_stagger_range(_left, _right)
-                st.session_state.target_stagger = float(_sa['max_all_sets'])
-
-            st.session_state.data_loaded = True
-            st.session_state.results = None
-
-            # Check for duplicates
-            dup_warnings = detect_input_duplicates(df)
-            st.session_state.duplicate_warnings = dup_warnings
-
-            if dup_warnings:
-                for warning in dup_warnings:
-                    st.sidebar.warning(warning)
-
-            st.sidebar.success(f"Loaded {len(df)} tires")
-        except Exception as e:
-            st.sidebar.error(f"Error: {e}")
-
-st.sidebar.divider()
-
-track_type = st.sidebar.radio(
-    "Track Type",
-    options=['Oval', 'Road Course'],
-    index=0 if st.session_state.track_type == 'Oval' else 1,
-    horizontal=True
-)
-if track_type != st.session_state.track_type:
-    st.session_state.results = None  # clear stale results on mode switch
-st.session_state.track_type = track_type
-
-if st.session_state.data_loaded and st.session_state.tire_df is not None:
-    st.sidebar.markdown("### Tire Setup")
-
-    if track_type == 'Oval':
-        # Oval: user picks the LS D-Code
-        if st.session_state.available_dcodes:
-            ls_dcode = st.sidebar.selectbox(
-                "Left Side D-Code (LF/LR)",
-                options=st.session_state.available_dcodes,
-                index=st.session_state.available_dcodes.index(st.session_state.ls_dcode) if st.session_state.ls_dcode in st.session_state.available_dcodes else 0,
-            )
-
-            if ls_dcode != st.session_state.ls_dcode:
-                st.session_state.ls_dcode = ls_dcode
-                st.session_state.results = None
-
-            rs_dcodes = [d for d in st.session_state.available_dcodes if d != ls_dcode]
-            if rs_dcodes:
-                st.sidebar.caption(f"Right Side: {', '.join(rs_dcodes)}")
-
-            left, right = assign_positions(st.session_state.tire_df, ls_dcode, track_type='Oval')
-            st.session_state.left_tires = left
-            st.session_state.right_tires = right
-
-    else:
-        # Road Course: split by Wheel suffix (A → LR/RF, non-A → LF/RR)
-        if 'Wheel' not in st.session_state.tire_df.columns:
-            st.sidebar.warning("No Wheel column found — Road Course requires Wheel data.")
-            st.session_state.left_tires = pd.DataFrame()
-            st.session_state.right_tires = pd.DataFrame()
-        else:
-            a_pool, non_a_pool = assign_positions(st.session_state.tire_df, '', track_type='Road Course')
-            st.session_state.left_tires = a_pool       # A tires → LR/RF pool
-            st.session_state.right_tires = non_a_pool  # non-A tires → LF/RR pool
-            st.sidebar.caption(f"'A' Wheels (LR/RF): **{len(a_pool)}** tires")
-            st.sidebar.caption(f"Non-A Wheels (LF/RR): **{len(non_a_pool)}** tires")
-
-
 # ============== MAIN AREA ==============
 st.markdown(f"#### {APP_TITLE}")
 
@@ -1404,6 +1303,111 @@ tab_settings, tab_results = st.tabs(["Setup & Sort", "Results & Refine"])
 
 # ---------- TAB 1: SETUP & SORT ----------
 with tab_settings:
+    # --- Import Data Section ---
+    st.markdown("### Import Data")
+
+    uploaded_file = st.file_uploader(
+        "Upload Excel File",
+        type=['xlsx', 'xlsm', 'xls'],
+        help="Excel file with Scan Data sheet"
+    )
+
+    if uploaded_file is not None:
+        token = (uploaded_file.name, uploaded_file.size)
+        if st.session_state._upload_token != token:
+            try:
+                df = load_tire_data(uploaded_file)
+                st.session_state.tire_df = df
+                st.session_state._upload_token = token
+
+                dcodes = sorted(df['D-Code'].unique().tolist())
+                st.session_state.available_dcodes = dcodes
+
+                # Auto-select LS D-Code as the one with smaller avg rollout
+                if len(dcodes) >= 2:
+                    avg_rollouts = {d: df[df['D-Code'] == d]['Rollout/Dia'].mean() for d in dcodes}
+                    st.session_state.ls_dcode = min(avg_rollouts, key=avg_rollouts.get)
+                elif dcodes:
+                    st.session_state.ls_dcode = dcodes[0]
+                else:
+                    st.session_state.ls_dcode = None
+
+                # Set default stagger target
+                if st.session_state.ls_dcode is not None:
+                    _left, _right = assign_positions(df, st.session_state.ls_dcode)
+                    _sa = analyze_stagger_range(_left, _right)
+                    st.session_state.target_stagger = float(_sa['max_all_sets'])
+
+                st.session_state.data_loaded = True
+                st.session_state.results = None
+
+                # Check for duplicates
+                dup_warnings = detect_input_duplicates(df)
+                st.session_state.duplicate_warnings = dup_warnings
+
+                if dup_warnings:
+                    for warning in dup_warnings:
+                        st.warning(warning)
+
+                st.success(f"Loaded {len(df)} tires")
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+    st.divider()
+
+    # --- Track Type Section ---
+    track_type = st.radio(
+        "Track Type",
+        options=['Oval', 'Road Course'],
+        index=0 if st.session_state.track_type == 'Oval' else 1,
+        horizontal=True,
+        key='track_type_selector'
+    )
+    st.session_state.track_type = track_type
+
+    st.divider()
+
+    # --- Tire Setup Info ---
+    if st.session_state.data_loaded and st.session_state.tire_df is not None:
+        st.markdown("### Tire Setup")
+        df = st.session_state.tire_df
+
+        if track_type == 'Oval':
+            # Show D-Code selector for Oval
+            dcodes = st.session_state.available_dcodes
+            if dcodes and len(dcodes) >= 2:
+                ls_dcode = st.selectbox(
+                    "Left Side D-Code",
+                    options=dcodes,
+                    index=dcodes.index(st.session_state.ls_dcode) if st.session_state.ls_dcode in dcodes else 0,
+                    key='ls_dcode_selector'
+                )
+                st.session_state.ls_dcode = ls_dcode
+
+                rs_dcodes = [d for d in dcodes if d != ls_dcode]
+                st.caption(f"Right Side: **{', '.join(rs_dcodes)}**")
+        else:
+            # Road Course: Show A-pool info and update tire pools
+            if 'Wheel' not in df.columns:
+                st.warning("No Wheel column found — Road Course requires Wheel data.")
+                st.session_state.left_tires = pd.DataFrame()
+                st.session_state.right_tires = pd.DataFrame()
+            else:
+                a_pool, non_a_pool = assign_positions(df, '', track_type='Road Course')
+                st.session_state.left_tires = a_pool
+                st.session_state.right_tires = non_a_pool
+                st.caption(f"'A' Wheels (LR/RF): **{len(a_pool)}** tires")
+                st.caption(f"Non-A Wheels (LF/RR): **{len(non_a_pool)}** tires")
+
+        # Update tire pools for Oval
+        if track_type == 'Oval' and st.session_state.ls_dcode:
+            left, right = assign_positions(df, st.session_state.ls_dcode, track_type='Oval')
+            st.session_state.left_tires = left
+            st.session_state.right_tires = right
+
+    st.divider()
+
+    # --- Main Setup Controls ---
     if st.session_state.data_loaded:
         left = st.session_state.left_tires
         right = st.session_state.right_tires
@@ -1959,5 +1963,3 @@ with tab_results:
 
 
 # ============== FOOTER ==============
-st.sidebar.divider()
-st.sidebar.caption("TRK Tire Sorter v1.0")
