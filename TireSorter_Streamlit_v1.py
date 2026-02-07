@@ -38,7 +38,7 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-.block-container { padding-top: .6rem; }
+.block-container { padding-top: .6rem; max-width: 100% !important; padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
 h1 { margin-bottom: .25rem; }
 [data-testid="stHeader"] { height: 2rem; background: transparent; }
 div[role="tablist"] { margin-top: .25rem; }
@@ -1684,20 +1684,77 @@ with tab_results:
 
         # --- Interactive car cards grid ---
         is_road_results = st.session_state.track_type == 'Road Course'
-        # --- CARD VIEW WITH 2-ROW AUTO-FIT LAYOUT ---
+        # --- CARD VIEW WITH PROGRESSIVE LAYOUT ---
         import math
 
-        # Calculate columns per row to fit all sets in 2 rows maximum
+        # Determine sizing mode and calculate columns based on set count
         n_sets = len(solution)
-        if n_sets <= 5:
-            # Single row for 5 or fewer sets
-            row1_cols = n_sets
-            row2_cols = 0
-        else:
-            # Two rows - distribute sets evenly
+
+        if n_sets <= 10:
+            # Standard mode: Current behavior (perfect for most weekends)
+            sizing_mode = 'standard'
+            if n_sets <= 5:
+                row1_cols = n_sets
+                row2_cols = 0
+            else:
+                row1_cols = 5
+                row2_cols = n_sets - 5
+
+        elif n_sets <= 15:
+            # Medium compact mode: Optimized for 11-15 sets
+            sizing_mode = 'medium'
             cols_per_row = math.ceil(n_sets / 2)
             row1_cols = cols_per_row
             row2_cols = n_sets - cols_per_row
+
+        else:
+            # Very compact mode: 16+ sets
+            sizing_mode = 'compact'
+            cols_per_row = math.ceil(n_sets / 2)
+            row1_cols = cols_per_row
+            row2_cols = n_sets - cols_per_row
+
+        # Apply mode-specific CSS for tighter spacing
+        if sizing_mode == 'medium':
+            st.markdown("""
+            <style>
+            /* Medium compact: Reduce spacing by ~30% for 11-15 sets */
+            div[data-testid="stVerticalBlockBorderWrapper"] {
+                margin: 4px !important;
+            }
+            .tire-box {
+                padding: 7px !important;
+            }
+            .car-stats {
+                padding: 4px 8px !important;
+                margin-bottom: 6px !important;
+            }
+            div[data-testid="column"] {
+                padding: 0 4px !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+
+        elif sizing_mode == 'compact':
+            st.markdown("""
+            <style>
+            /* Very compact: Reduce spacing by ~50% for 16+ sets */
+            div[data-testid="stVerticalBlockBorderWrapper"] {
+                margin: 2px !important;
+            }
+            .tire-box {
+                padding: 5px !important;
+            }
+            .car-stats {
+                padding: 3px 6px !important;
+                margin-bottom: 4px !important;
+                font-size: 12px !important;
+            }
+            div[data-testid="column"] {
+                padding: 0 2px !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
 
         # First row
         if row1_cols > 0:
