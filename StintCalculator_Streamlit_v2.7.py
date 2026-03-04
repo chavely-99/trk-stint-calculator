@@ -1,6 +1,7 @@
-# StintCalculator_Streamlit_v2.7.py
+# StintCalculator_Streamlit_v2.8.py
 # Per-car green-flag stints; UX + pace compare + per-row falloff models for strategies
 # v2.7: Added manual coefficient adjustment for falloff curves
+# v2.8: Added Create Manual Model — build a falloff curve from key-lap time inputs, no raw data needed
 
 import io
 import json
@@ -9,6 +10,7 @@ from string import Template
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
 import altair as alt
 import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
@@ -72,6 +74,14 @@ details[open] {
 }
 </style>
 """, unsafe_allow_html=True)
+
+# ---- pyarrow/numpy compat helper ----
+# pyarrow 17.x + numpy 1.26 break pa.array(numpy_array) for ALL dtypes.
+# Building columns from Python lists via pd.ArrowDtype bypasses the broken
+# _ndarray_to_array / _ndarray_to_type C++ path entirely.
+def _acol(values, arrow_type):
+    """Return a pandas array backed by Arrow (avoids pyarrow numpy-compat bug)."""
+    return pd.array(list(values), dtype=pd.ArrowDtype(arrow_type))
 
 # ========================= math =========================
 def falloff_equation(x: np.ndarray, a: float, b: float, c: float) -> np.ndarray:
@@ -739,35 +749,46 @@ with tab1:
             cars_for_table = [str(c) for c in df_r.columns if str(c) in st.session_state.car_visible]
             if not df_r.empty and cars_for_table:
                 cars_for_table = sorted(cars_for_table, key=_numeric_then_alpha)
-                table = pd.DataFrame({"Lap": np.arange(1, df_r.shape[0] + 1, dtype=int)})
-                for car in cars_for_table:
-                    table[car] = pd.to_numeric(df_r[car], errors="coerce")
 
                 slow_thr = float(st.session_state.get("slow_thresh", 4.0))
                 med_by_car = {
                     car: float(pd.to_numeric(df_r[car], errors="coerce").median())
                     for car in cars_for_table
                 }
+                # Build per-car value lists via Python (no Arrow/numpy conversion needed)
+                n_laps = df_r.shape[0]
+                car_data = {
+                    car: pd.to_numeric(df_r[car], errors="coerce").tolist()
+                    for car in cars_for_table
+                }
 
-                def _style_slow(dfX: pd.DataFrame):
-                    sty = pd.DataFrame("", index=dfX.index, columns=dfX.columns)
+                # Render as plain HTML to bypass pyarrow styled-DataFrame issues
+                _th = "padding:4px 8px;border-bottom:2px solid #ddd;background:#fafafa;font-weight:600;white-space:nowrap"
+                _td = "padding:3px 8px;border-bottom:1px solid #eee;font-size:13px"
+                hdr = f"<th style='{_th};text-align:center'>Lap</th>"
+                hdr += "".join(f"<th style='{_th};text-align:right'>{car}</th>" for car in cars_for_table)
+                body = ""
+                for i in range(n_laps):
+                    cells = f"<td style='{_td};text-align:center'>{i + 1}</td>"
                     for car in cars_for_table:
-                        if car in dfX.columns:
-                            slow_mask = dfX[car] > (med_by_car[car] + slow_thr)
-                            nan_mask = dfX[car].isna()
-                            sty.loc[slow_mask, car] = "background-color: #ffd6d6"
-                            sty.loc[nan_mask, car] = "background-color: #f2f2f2; color: #888"
-                    if "Lap" in dfX.columns:
-                        sty["Lap"] = ""
-                    return sty
+                        v = car_data[car][i] if i < len(car_data[car]) else None
+                        if v is None or (isinstance(v, float) and np.isnan(v)):
+                            cells += f"<td style='{_td};background:#f2f2f2;color:#888;text-align:right'></td>"
+                        elif v > med_by_car[car] + slow_thr:
+                            cells += f"<td style='{_td};background:#ffd6d6;text-align:right'>{v:.3f}</td>"
+                        else:
+                            cells += f"<td style='{_td};text-align:right'>{v:.3f}</td>"
+                    body += f"<tr>{cells}</tr>"
 
-                approx_rows = min(20, int(table.shape[0]))
+                approx_rows = min(20, n_laps)
                 height = 40 + 28 * approx_rows
-                st.dataframe(
-                    table.style.apply(_style_slow, axis=None).format(precision=3),
-                    width="stretch",
-                    height=height,
-                    hide_index=True,
+                st.html(
+                    f"<div style='max-height:{height}px;overflow-y:auto;border:1px solid #e0e0e0;"
+                    f"border-radius:4px;font-family:monospace'>"
+                    f"<table style='width:100%;border-collapse:collapse'>"
+                    f"<thead style='position:sticky;top:0;z-index:1'><tr>{hdr}</tr></thead>"
+                    f"<tbody>{body}</tbody>"
+                    f"</table></div>"
                 )
             else:
                 st.info("Select at least one car to view lap times.")
@@ -944,7 +965,14 @@ with tab1:
                     # Display results per car
                     for car, penalties in all_penalties.items():
                         st.markdown(f"<p style='margin-bottom: 0.25rem; font-weight: bold;'>Car {car}</p>", unsafe_allow_html=True)
-                        pen_df = pd.DataFrame(penalties)
+                        pen_df = pd.DataFrame({
+                            "Pit Laps":            _acol([p["Pit Laps"]            for p in penalties], pa.string()),
+                            "Final Stint Lap (s)": _acol([p["Final Stint Lap (s)"] for p in penalties], pa.float64()),
+                            "Pit In (s)":          _acol([p["Pit In (s)"]          for p in penalties], pa.float64()),
+                            "Pit Out (s)":         _acol([p["Pit Out (s)"]         for p in penalties], pa.float64()),
+                            "First Stint Lap (s)": _acol([p["First Stint Lap (s)"] for p in penalties], pa.float64()),
+                            "Penalty (s)":         _acol([p["Penalty (s)"]         for p in penalties], pa.float64()),
+                        })
                         st.dataframe(pen_df, hide_index=True, width="stretch")
 
                         # Show average penalty for this car
@@ -1115,7 +1143,11 @@ with tab1:
                 rows_plot.append({"Series": "Aligned Avg", "Aligned Lap": j, "Lap Time": y})
 
             if rows_plot:
-                plot_df = pd.DataFrame(rows_plot)
+                plot_df = pd.DataFrame({
+                    "Series":      _acol([r["Series"]      for r in rows_plot], pa.string()),
+                    "Aligned Lap": _acol([r["Aligned Lap"] for r in rows_plot], pa.float64()),
+                    "Lap Time":    _acol([r["Lap Time"]    for r in rows_plot], pa.float64()),
+                })
                 ordered = sorted(visible_plot, key=_numeric_then_alpha)
                 domain = ordered + ["Aligned Avg"]
                 range_colors = [
@@ -1264,7 +1296,16 @@ with tab2:
                 rows.append({"Series": model_name, "Kind": "fit", "x": float(xi), "y": float(yi), "color": color})
 
         if rows:
-            chart_df = pd.DataFrame(rows)
+            # ArrowDtype string columns bypass the broken pa.array(numpy_obj_array) path
+            # in pyarrow 17.x — ArrowExtensionArray.__arrow_array__() returns the backing
+            # pa array directly, so _ndarray_to_array is never called.
+            chart_df = pd.DataFrame({
+                "Series": _acol([r["Series"] for r in rows], pa.string()),
+                "Kind":   _acol([r["Kind"]   for r in rows], pa.string()),
+                "x":      _acol([r["x"]       for r in rows], pa.float64()),
+                "y":      _acol([r["y"]       for r in rows], pa.float64()),
+                "color":  _acol([r["color"]   for r in rows], pa.string()),
+            })
             model_domain = sorted({r["Series"] for r in rows})
             color_map = {m: st.session_state.model_colors.get(m, "#1f77b4") for m in model_domain}
             model_range = [color_map[m] for m in model_domain]
@@ -1292,9 +1333,126 @@ with tab2:
 
     # ========================= RIGHT: Model Summary =========================
     with right:
+        # ---- v2.8: Create Manual Model ----
+        with st.expander("➕ Create Manual Model", expanded=False):
+            st.caption("Enter lap times at key laps to build a falloff curve — no raw data needed.")
+            man_name = st.text_input("Model name", value="Manual Model", key="manual_model_name")
+
+            _n_kp = st.number_input("Number of key laps", min_value=2, max_value=8, value=4, step=1, key="manual_n_kp")
+            _default_lap_vals = [3, 10, 20, 30, 40, 50, 60, 70]
+
+            _hc1, _hc2 = st.columns([1, 2])
+            _hc1.caption("Lap #")
+            _hc2.caption("Lap Time (s)")
+
+            _kp_data = []
+            for _i in range(int(_n_kp)):
+                _cc1, _cc2 = st.columns([1, 2])
+                with _cc1:
+                    _lap_v = st.number_input(
+                        f"kp_lap_{_i}", min_value=1, max_value=200,
+                        value=_default_lap_vals[_i], step=1,
+                        key=f"man_lap_{_i}", label_visibility="collapsed",
+                    )
+                with _cc2:
+                    _time_v = st.number_input(
+                        f"kp_time_{_i}", min_value=0.0, value=0.0,
+                        step=0.001, format="%.3f",
+                        key=f"man_time_{_i}", label_visibility="collapsed",
+                    )
+                _kp_data.append((_lap_v, _time_v))
+
+            if st.button("Create Model", key="btn_create_manual", type="primary"):
+                # Filter to rows where user entered a time (> 0)
+                kp_v = sorted(
+                    [(int(l), float(t)) for l, t in _kp_data if float(t) > 0 and int(l) >= 1],
+                    key=lambda r: r[0]
+                )
+                # Deduplicate laps
+                seen_laps = set()
+                kp_v = [r for r in kp_v if r[0] not in seen_laps and not seen_laps.add(r[0])]
+
+                _errs = []
+                if len(kp_v) < 2:
+                    _errs.append("Enter lap times (> 0) for at least 2 key laps.")
+                _target = man_name.strip()
+                if not _target:
+                    _errs.append("Model name cannot be empty.")
+                elif _target in st.session_state.model_table.columns:
+                    _errs.append(f"A model named '{_target}' already exists.")
+
+                if _errs:
+                    for _e in _errs:
+                        st.error(_e)
+                else:
+                    _laps = [r[0] for r in kp_v]
+                    _times = [r[1] for r in kp_v]
+                    _max_lap = _laps[-1]
+
+                    # Build full series via linear interpolation between key laps
+                    _sv = np.empty(_max_lap)
+                    # Flat-fill lap 1 → first key lap
+                    for _lap in range(1, _laps[0] + 1):
+                        _sv[_lap - 1] = _times[0]
+                    # Interpolate between consecutive key laps
+                    for _i in range(len(_laps) - 1):
+                        _l1, _t1 = _laps[_i], _times[_i]
+                        _l2, _t2 = _laps[_i + 1], _times[_i + 1]
+                        for _lap in range(_l1, _l2 + 1):
+                            _frac = (_lap - _l1) / (_l2 - _l1)
+                            _sv[_lap - 1] = _t1 + _frac * (_t2 - _t1)
+
+                    # Add column to model_table
+                    if st.session_state.model_table.empty:
+                        st.session_state.model_table = pd.DataFrame(
+                            {_target: [round(float(v), 3) for v in _sv]}
+                        )
+                    else:
+                        _cur_rows = st.session_state.model_table.shape[0]
+                        st.session_state.model_table[_target] = pd.Series(dtype=float)
+                        if _max_lap > _cur_rows:
+                            _extra = pd.DataFrame(
+                                [[None] * len(st.session_state.model_table.columns)] * (_max_lap - _cur_rows),
+                                columns=st.session_state.model_table.columns,
+                            )
+                            st.session_state.model_table = pd.concat(
+                                [st.session_state.model_table, _extra], ignore_index=True
+                            )
+                        st.session_state.model_table.loc[:_max_lap - 1, _target] = [
+                            round(float(v), 3) for v in _sv
+                        ]
+
+                    # Fit falloff coefficients so model registers as active
+                    _x = np.arange(1, _max_lap + 1, dtype=float)
+                    _y = _sv.astype(float)
+                    try:
+                        _fa, _fb, _fc = fit_falloff_linear_ls(_x, _y)
+                        st.session_state.model_params[_target] = (_fa, _fb, _fc)
+                        st.session_state.model_params_original[_target] = (_fa, _fb, _fc)
+                    except Exception:
+                        st.session_state.model_params[_target] = (_times[0], 0.0, 0.0)
+                        st.session_state.model_params_original[_target] = (_times[0], 0.0, 0.0)
+
+                    # Piecewise mode: transitions at key laps (laps[1:], padded to 4)
+                    _t_laps = [float(l) for l in _laps[1:]]
+                    while len(_t_laps) < 4:
+                        _t_laps.append(_t_laps[-1] + 5.0)
+                    _t_laps = sorted(_t_laps[:4])
+                    _pw_slopes, _pw_intercepts = refit_linear_segments(_x, _y, _t_laps)
+                    st.session_state.model_linear_params[_target] = {
+                        "transitions": _t_laps,
+                        "slopes": _pw_slopes,
+                        "intercepts": _pw_intercepts,
+                    }
+                    st.session_state.model_linear_mode[_target] = True
+                    st.session_state.model_visible[_target] = True
+
+                    st.success(f"Model '{_target}' created.")
+                    st.rerun()
+
         cols = active_cols
         if not cols:
-            st.info("No models yet. Export data from Tab 1 to create models.")
+            st.info("No models yet. Export data from Tab 1 or create one above.")
         else:
             st.caption(f"**{len(cols)}** model(s) loaded")
 
@@ -1388,7 +1546,7 @@ with tab2:
                                     for i, t in enumerate(transitions):
                                         with trans_rows[i % 2]:
                                             # T4 (last transition) can go beyond data for extrapolation
-                                            max_val = 150 if i == len(transitions) - 1 else int(n_laps) - 1
+                                            max_val = 150 if i == len(transitions) - 1 else int(n_laps)
                                             min_val = 2 if i == 0 else int(transitions[i-1]) + 1
                                             new_t = st.number_input(f"T{i+1}", value=int(t), min_value=min_val, max_value=max_val, step=1, key=f"trans_{name}_{i}")
                                             new_transitions.append(float(new_t))
@@ -1475,11 +1633,25 @@ with tab2:
     # =============================== Lap Time Models (table) ===============================
     with st.expander("Lap Time Models (Data Table)", expanded=False):
         st.caption("View and edit lap times for each model. Models are automatically fitted when created.")
-        st.session_state.model_table = st.data_editor(
-            st.session_state.model_table,
-            num_rows="dynamic",
-            width="stretch",
-        )
+        # Convert to Arrow-backed columns so st.data_editor's pa.Table.from_pandas() works
+        _mt = st.session_state.model_table
+        if not _mt.empty:
+            _mt_arrow = pd.DataFrame({
+                col: _acol(pd.to_numeric(_mt[col], errors="coerce").tolist(), pa.float64())
+                for col in _mt.columns
+            })
+        else:
+            _mt_arrow = _mt
+        _edited = st.data_editor(_mt_arrow, num_rows="dynamic", width="stretch")
+        # Convert back to standard float64. Go through Python list to avoid
+        # ArrowExtensionArray.to_numpy() hitting the same pyarrow/numpy compat bug.
+        if not _edited.empty:
+            st.session_state.model_table = pd.DataFrame({
+                col: pd.to_numeric(list(_edited[col]), errors="coerce")
+                for col in _edited.columns
+            })
+        else:
+            st.session_state.model_table = _edited
 
         # Refit button for manual edits
         if st.button("Refit All Models", key="btn_refit_all", help="Refit all models after manual edits"):
@@ -1606,8 +1778,13 @@ with tab3:
         ]
 
     # ---------- utilities ----------
-    def _tight_y(vals: np.ndarray) -> tuple[float, float]:
-        if vals is None or len(vals) == 0 or np.all(np.isnan(vals)):
+    def _tight_y(vals) -> tuple[float, float]:
+        if vals is None or len(vals) == 0:
+            return (-1.0, 1.0)
+        # ArrowExtensionArray → numpy via list (avoids pyarrow 17 numpy compat bug)
+        if not isinstance(vals, np.ndarray):
+            vals = np.array(list(vals), dtype=float)
+        if np.all(np.isnan(vals)):
             return (-1.0, 1.0)
         s = pd.Series(vals).dropna()
         if s.empty:
@@ -1901,14 +2078,23 @@ with tab3:
                         })
 
                     if df_rows:
-                        df = pd.DataFrame(df_rows)
+                        df = pd.DataFrame({
+                            "Show":      _acol([r["Show"]      for r in df_rows], pa.bool_()),
+                            "Color":     _acol([r["Color"]     for r in df_rows], pa.string()),
+                            "Strategy":  _acol([r["Strategy"]  for r in df_rows], pa.string()),
+                            "Pre | Post":_acol([r["Pre | Post"] for r in df_rows], pa.string()),
+                            "Pit Stops": _acol([r["Pit Stops"] for r in df_rows], pa.string()),
+                            "Total (s)": _acol([r["Total (s)"] for r in df_rows], pa.float64()),
+                            "Δ (s)":     _acol([r["Δ (s)"]     for r in df_rows], pa.float64()),
+                            "Delete":    _acol([r["Delete"]    for r in df_rows], pa.bool_()),
+                        })
                         edited_df = st.data_editor(
                             df,
                             hide_index=True,
                             use_container_width=True,
                             column_config={
                                 "Show": st.column_config.CheckboxColumn("View", help="Show on plot", default=True, width="small"),
-                                "Color": st.column_config.TextColumn("", disabled=True, width=20),
+                                "Color": st.column_config.TextColumn("", disabled=True, width=5),
                                 "Strategy": st.column_config.TextColumn("Strategy", disabled=True),
                                 "Pre | Post": st.column_config.TextColumn("Pre | Post", disabled=True),
                                 "Pit Stops": st.column_config.TextColumn("Pit Stops", disabled=True),
@@ -1921,12 +2107,15 @@ with tab3:
                         )
 
                         # Update visibility
+                        # Access column-first to avoid mixed-ArrowDtype row merge bug
+                        show_col = edited_df["Show"]
                         for i, stg in enumerate(strategies):
                             if i < len(edited_df):
-                                stg["visible"] = bool(edited_df.iloc[i]["Show"])
+                                stg["visible"] = bool(show_col.iat[i])
 
                         # Show delete button only if rows are marked
-                        delete_indices = [i for i in range(len(edited_df)) if edited_df.iloc[i]["Delete"]]
+                        delete_col = edited_df["Delete"]
+                        delete_indices = [i for i in range(len(edited_df)) if delete_col.iat[i]]
                         if delete_indices:
                             num = len(delete_indices)
                             if st.button(f"Confirm Delete ({num})", key=f"confirm_del_{tab_idx}", type="primary"):
@@ -1987,11 +2176,15 @@ with tab3:
                                 drows.append({"Lap": int(xv), "Δ vs Best (s)": float(dv), "SeriesKey": key})
 
                     if drows:
-                        ddf = pd.DataFrame(drows)
+                        ddf = pd.DataFrame({
+                            "Lap":           _acol([r["Lap"]           for r in drows], pa.int64()),
+                            "Δ vs Best (s)": _acol([r["Δ vs Best (s)"] for r in drows], pa.float64()),
+                            "SeriesKey":     _acol([r["SeriesKey"]     for r in drows], pa.string()),
+                        })
                         lo, hi = _tight_y(ddf["Δ vs Best (s)"].values)
                         color_scale = alt.Scale(domain=series_keys, range=colors)
                         # Zero line
-                        zero_line = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(color="black", strokeWidth=1).encode(y="y:Q")
+                        zero_line = alt.Chart(pd.DataFrame({"y": _acol([0.0], pa.float64())})).mark_rule(color="black", strokeWidth=1).encode(y="y:Q")
                         ch = (
                             alt.Chart(ddf)
                             .mark_line(clip=True)
@@ -2036,11 +2229,15 @@ with tab3:
                                 gap_rows.append({"Lap": int(actual_lap), "Gap (s)": float(gap), "SeriesKey": key})
 
                     if gap_rows:
-                        gdf = pd.DataFrame(gap_rows)
+                        gdf = pd.DataFrame({
+                            "Lap":       _acol([r["Lap"]       for r in gap_rows], pa.int64()),
+                            "Gap (s)":   _acol([r["Gap (s)"]   for r in gap_rows], pa.float64()),
+                            "SeriesKey": _acol([r["SeriesKey"] for r in gap_rows], pa.string()),
+                        })
                         lo, hi = _tight_y(gdf["Gap (s)"].values)
                         color_scale = alt.Scale(domain=series_keys, range=colors)
                         # Zero line
-                        zero_line = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(color="black", strokeWidth=1).encode(y="y:Q")
+                        zero_line = alt.Chart(pd.DataFrame({"y": _acol([0.0], pa.float64())})).mark_rule(color="black", strokeWidth=1).encode(y="y:Q")
                         ch = (
                             alt.Chart(gdf)
                             .mark_line(clip=True)
@@ -2111,19 +2308,32 @@ with tab3:
                                      "Initial Δ (s)": round(float(-init_gain), 2),
                                      "Final Δ (s)": round(float(final_delta), 2)})
                     if rows:
-                        wdf = pd.DataFrame(rows)
-                        def highlight_even(row):
-                            if row.name == even_row_idx:
-                                return ['font-weight: bold'] * len(row)
-                            return [''] * len(row)
-                        styled = (wdf.style
-                            .apply(highlight_even, axis=1)
-                            .format({"Initial Δ (s)": "{:.2f}", "Final Δ (s)": "{:.2f}"})
-                            .set_table_styles([{'selector': 'th', 'props': [('font-weight', 'bold')]}])
+                        # Render as HTML to avoid pyarrow Styler incompatibility
+                        _th = "padding:5px 10px;border-bottom:2px solid #ddd;background:#fafafa;font-weight:700;white-space:nowrap"
+                        _td = "padding:4px 10px;border-bottom:1px solid #eee;font-size:13px"
+                        hdr_cells = "".join(
+                            f"<th style='{_th};text-align:center'>{c}</th>"
+                            for c in ["Early/Late", "Pit Lap", "Initial Δ (s)", "Final Δ (s)"]
                         )
-                        # Calculate height to fit all rows without scrolling (header + rows * ~35px per row)
+                        body_rows = ""
+                        for ri, r in enumerate(rows):
+                            fw = "font-weight:bold;" if ri == even_row_idx else ""
+                            body_rows += (
+                                f"<tr>"
+                                f"<td style='{_td};{fw}text-align:center'>{r['Early/Late']}</td>"
+                                f"<td style='{_td};{fw}text-align:center'>{r['Pit Lap']}</td>"
+                                f"<td style='{_td};{fw}text-align:right'>{r['Initial Δ (s)']:.2f}</td>"
+                                f"<td style='{_td};{fw}text-align:right'>{r['Final Δ (s)']:.2f}</td>"
+                                f"</tr>"
+                            )
                         table_height = (len(rows) + 1) * 35 + 3
-                        st.dataframe(styled, hide_index=True, use_container_width=True, height=table_height)
+                        st.html(
+                            f"<div style='border:1px solid #e0e0e0;border-radius:4px;font-family:monospace'>"
+                            f"<table style='width:100%;border-collapse:collapse'>"
+                            f"<thead><tr>{hdr_cells}</tr></thead>"
+                            f"<tbody>{body_rows}</tbody>"
+                            f"</table></div>"
+                        )
                     else:
                         st.info("Stint range too small for what-if analysis.")
         else:
@@ -2157,8 +2367,8 @@ with tab3:
                 x = np.arange(lo, hi + 1, dtype=int)
                 inst_delta = a_laps[idxA] - b_laps[idxB]
                 lo2, hi2 = _robust_y_lims(inst_delta)
-                df_inst = pd.DataFrame({"Lap": x, "Δ Lap Time (A − B) (s)": inst_delta})
-                zero = alt.Chart(pd.DataFrame({"y": [0.0]})).mark_rule(strokeDash=[3, 3]).encode(y="y:Q")
+                df_inst = pd.DataFrame({"Lap": _acol(x.tolist(), pa.int64()), "Δ Lap Time (A − B) (s)": _acol(inst_delta.tolist(), pa.float64())})
+                zero = alt.Chart(pd.DataFrame({"y": _acol([0.0], pa.float64())})).mark_rule(strokeDash=[3, 3]).encode(y="y:Q")
                 ch = (
                     alt.Chart(df_inst)
                     .mark_line(clip=True)
@@ -2242,18 +2452,22 @@ with tab3:
 
         if bestL is not None:
             window = list(range(max(bestL - 8, lengths[0]), min(bestL + 8, lengths[-1]) + 1))
-            wdf = pd.DataFrame([{
-                "Stint L (laps)": L,
-                "No-Stop (s)": round(_total_ns(L), 1),
-                "Even-Split (s)": round(_total_even(L), 1),
-                "Δ = NS − ES (s)": round(_total_ns(L) - _total_even(L), 2),
-            } for L in window])
+            _wrows = [{"Stint L (laps)": L, "No-Stop (s)": round(_total_ns(L), 1),
+                        "Even-Split (s)": round(_total_even(L), 1),
+                        "Δ = NS − ES (s)": round(_total_ns(L) - _total_even(L), 2)}
+                      for L in window]
+            wdf = pd.DataFrame({
+                "Stint L (laps)":  _acol([r["Stint L (laps)"]  for r in _wrows], pa.int64()),
+                "No-Stop (s)":     _acol([r["No-Stop (s)"]     for r in _wrows], pa.float64()),
+                "Even-Split (s)":  _acol([r["Even-Split (s)"]  for r in _wrows], pa.float64()),
+                "Δ = NS − ES (s)": _acol([r["Δ = NS − ES (s)"] for r in _wrows], pa.float64()),
+            })
             st.dataframe(wdf, width="stretch", hide_index=True, height=320)
 
         if lengths:
-            df = pd.DataFrame({"Laps": lengths, "Δ (NS − ES) (s)": deltas})
+            df = pd.DataFrame({"Laps": _acol(lengths, pa.int64()), "Δ (NS − ES) (s)": _acol(deltas, pa.float64())})
             lo, hi = _tight_y(np.array(deltas, dtype=float))
-            zero = alt.Chart(pd.DataFrame({"y": [0.0]})).mark_rule(strokeDash=[3, 3]).encode(y="y:Q")
+            zero = alt.Chart(pd.DataFrame({"y": _acol([0.0], pa.float64())})).mark_rule(strokeDash=[3, 3]).encode(y="y:Q")
             ch = (
                 alt.Chart(df).mark_line(clip=True).encode(
                     x=alt.X("Laps:Q", axis=alt.Axis(title="Stint Length (laps)", titleFontWeight="bold", tickMinStep=1, format="d")),
