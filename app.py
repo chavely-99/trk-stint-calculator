@@ -1228,20 +1228,32 @@ with tab2:
         _p_laps  = [r[0] for r in _prev_kp]
         _p_times = [r[1] for r in _prev_kp]
         _p_max   = _p_laps[-1]
-        _p_sv    = np.empty(_p_max)
-        for _lap in range(1, _p_laps[0] + 1):
-            _p_sv[_lap - 1] = _p_times[0]
-        for _pi in range(len(_p_laps) - 1):
-            _l1, _t1 = _p_laps[_pi],     _p_times[_pi]
-            _l2, _t2 = _p_laps[_pi + 1], _p_times[_pi + 1]
-            for _lap in range(_l1, _l2 + 1):
-                _p_sv[_lap - 1] = _t1 + (_t2 - _t1) * (_lap - _l1) / (_l2 - _l1)
+        _p_x     = np.array(_p_laps,  dtype=float)
+        _p_y     = np.array(_p_times, dtype=float)
+        # Fit the same falloff equation used by the real model so the preview
+        # shows a smooth curve, not a jagged piecewise-linear interpolation
+        try:
+            _p_a, _p_b, _p_c = fit_falloff_linear_ls(_p_x, _p_y)
+            _p_fx = np.linspace(1.0, float(_p_max), max(200, _p_max * 4))
+            _p_fy = falloff_equation(_p_fx, _p_a, _p_b, _p_c)
+        except Exception:
+            # Fallback to linear interpolation if fit fails
+            _p_sv = np.empty(_p_max)
+            for _lap in range(1, _p_laps[0] + 1):
+                _p_sv[_lap - 1] = _p_times[0]
+            for _pi in range(len(_p_laps) - 1):
+                _l1, _t1 = _p_laps[_pi], _p_times[_pi]
+                _l2, _t2 = _p_laps[_pi + 1], _p_times[_pi + 1]
+                for _lap in range(_l1, _l2 + 1):
+                    _p_sv[_lap - 1] = _t1 + (_t2 - _t1) * (_lap - _l1) / (_l2 - _l1)
+            _p_fx = np.arange(1, _p_max + 1, dtype=float)
+            _p_fy = _p_sv
         for _pl, _pt in zip(_p_laps, _p_times):
             _preview_rows.append({"Series": _PREV_NAME, "Kind": "keypoint",
                                    "x": float(_pl), "y": float(_pt), "color": _PREV_COLOR})
-        for _pi2, _v in enumerate(_p_sv):
+        for _xi, _yi in zip(_p_fx, _p_fy):
             _preview_rows.append({"Series": _PREV_NAME, "Kind": "fit",
-                                   "x": float(_pi2 + 1), "y": float(_v), "color": _PREV_COLOR})
+                                   "x": float(_xi), "y": float(_yi), "color": _PREV_COLOR})
 
     left, right = st.columns([2, 1], gap="large")
 
