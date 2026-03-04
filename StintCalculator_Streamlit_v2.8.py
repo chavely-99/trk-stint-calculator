@@ -1341,6 +1341,38 @@ with tab2:
             _n_kp = st.number_input("Number of key laps", min_value=2, max_value=8, value=4, step=1, key="manual_n_kp")
             _default_lap_vals = [3, 10, 20, 30, 40, 50, 60, 70]
 
+            # Pre-fill lap times from an existing model
+            _seed_models = [m for m in st.session_state.get("model_params", {}).keys()]
+            if _seed_models:
+                _sf1, _sf2, _sf3 = st.columns([3, 1, 1])
+                _seed_sel = _sf1.selectbox(
+                    "Pre-fill from", ["(none)"] + _seed_models,
+                    key="manual_seed_model", label_visibility="collapsed"
+                )
+                _seed_off = _sf2.number_input(
+                    "Offset", value=0.1, step=0.01, format="%.2f",
+                    key="manual_seed_offset", label_visibility="collapsed"
+                )
+                if _sf3.button("Load", key="btn_seed_manual", use_container_width=True):
+                    if _seed_sel != "(none)":
+                        _mt = st.session_state.model_table
+                        _mp = st.session_state.model_params.get(_seed_sel)
+                        for _si in range(int(_n_kp)):
+                            _lap_num = int(st.session_state.get(f"man_lap_{_si}", _default_lap_vals[_si]))
+                            _val = None
+                            # Try model_table first (has piecewise values too)
+                            if not _mt.empty and _seed_sel in _mt.columns and _lap_num - 1 < len(_mt):
+                                _v = pd.to_numeric(_mt[_seed_sel].iloc[_lap_num - 1], errors="coerce")
+                                if pd.notna(_v):
+                                    _val = float(_v)
+                            # Fall back to curve params
+                            if _val is None and _mp is not None:
+                                _a, _b, _c = _mp
+                                _val = _a + _b * _lap_num**(-0.5) + _c * _lap_num**(-0.5) * np.log(max(_lap_num, 1))
+                            if _val is not None:
+                                st.session_state[f"man_time_{_si}"] = round(_val + float(_seed_off), 3)
+                        st.rerun()
+
             _hc1, _hc2 = st.columns([1, 2])
             _hc1.caption("Lap #")
             _hc2.caption("Lap Time (s)")
