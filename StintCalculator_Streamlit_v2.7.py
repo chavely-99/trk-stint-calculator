@@ -1210,6 +1210,39 @@ with tab2:
                 except Exception:
                     pass
 
+    # ---- Live preview: build from current session state widget values ----
+    _PREV_NAME  = "⬡ Preview"
+    _PREV_COLOR = "#aaaaaa"
+    _prev_n_kp  = int(st.session_state.get("manual_n_kp", 4))
+    _prev_def   = [3, 10, 20, 30, 40, 50, 60, 70]
+    _prev_seen  = {}
+    for _pi in range(_prev_n_kp):
+        _pl = int(st.session_state.get(f"man_lap_{_pi}", _prev_def[_pi]))
+        _pt = float(st.session_state.get(f"man_time_{_pi}", 0.0))
+        if _pt > 0:
+            _prev_seen[_pl] = _pt
+    _prev_kp = sorted(_prev_seen.items())
+    _prev_model_name = st.session_state.get("manual_model_name", "").strip()
+    _preview_rows = []
+    if len(_prev_kp) >= 2 and _prev_model_name not in active_cols:
+        _p_laps  = [r[0] for r in _prev_kp]
+        _p_times = [r[1] for r in _prev_kp]
+        _p_max   = _p_laps[-1]
+        _p_sv    = np.empty(_p_max)
+        for _lap in range(1, _p_laps[0] + 1):
+            _p_sv[_lap - 1] = _p_times[0]
+        for _pi in range(len(_p_laps) - 1):
+            _l1, _t1 = _p_laps[_pi],     _p_times[_pi]
+            _l2, _t2 = _p_laps[_pi + 1], _p_times[_pi + 1]
+            for _lap in range(_l1, _l2 + 1):
+                _p_sv[_lap - 1] = _t1 + (_t2 - _t1) * (_lap - _l1) / (_l2 - _l1)
+        for _pl, _pt in zip(_p_laps, _p_times):
+            _preview_rows.append({"Series": _PREV_NAME, "Kind": "keypoint",
+                                   "x": float(_pl), "y": float(_pt), "color": _PREV_COLOR})
+        for _pi2, _v in enumerate(_p_sv):
+            _preview_rows.append({"Series": _PREV_NAME, "Kind": "fit",
+                                   "x": float(_pi2 + 1), "y": float(_v), "color": _PREV_COLOR})
+
     left, right = st.columns([2, 1], gap="large")
 
     # ========================= LEFT: Plot =========================
@@ -1295,6 +1328,8 @@ with tab2:
             for xi, yi in zip(fx, fy):
                 rows.append({"Series": model_name, "Kind": "fit", "x": float(xi), "y": float(yi), "color": color})
 
+        rows.extend(_preview_rows)
+
         if rows:
             # ArrowDtype string columns bypass the broken pa.array(numpy_obj_array) path
             # in pyarrow 17.x — ArrowExtensionArray.__arrow_array__() returns the backing
@@ -1307,7 +1342,10 @@ with tab2:
                 "color":  _acol([r["color"]   for r in rows], pa.string()),
             })
             model_domain = sorted({r["Series"] for r in rows})
-            color_map = {m: st.session_state.model_colors.get(m, "#1f77b4") for m in model_domain}
+            color_map = {
+                m: (_PREV_COLOR if m == _PREV_NAME else st.session_state.model_colors.get(m, "#1f77b4"))
+                for m in model_domain
+            }
             model_range = [color_map[m] for m in model_domain]
 
             base = alt.Chart(chart_df).encode(
@@ -1327,7 +1365,11 @@ with tab2:
             trans_pts = base.transform_filter(alt.datum.Kind == "transition").mark_point(
                 shape="diamond", size=150, filled=True, stroke="white", strokeWidth=1
             )
-            st.altair_chart((line + pts + trans_pts).properties(height=540), width="stretch")
+            # Live preview key-lap markers - circles with white outline
+            key_pts = base.transform_filter(alt.datum.Kind == "keypoint").mark_point(
+                shape="circle", size=90, filled=True, stroke="white", strokeWidth=1.5
+            )
+            st.altair_chart((line + pts + trans_pts + key_pts).properties(height=540), width="stretch")
         else:
             st.info("Fit models to see a plot.")
 
@@ -1389,7 +1431,7 @@ with tab2:
                 with _cc2:
                     _time_v = st.number_input(
                         f"kp_time_{_i}", min_value=0.0, value=0.0,
-                        step=0.001, format="%.3f",
+                        step=0.05, format="%.3f",
                         key=f"man_time_{_i}", label_visibility="collapsed",
                     )
                 _kp_data.append((_lap_v, _time_v))
